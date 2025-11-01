@@ -8,6 +8,7 @@
  * Idempotency: Uses cron_logs table to prevent duplicate execution
  */
 
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import pino from "pino";
 import { env } from "~/env";
@@ -19,6 +20,14 @@ import {
 import { db } from "~/server/db";
 
 const logger = pino({ name: "cron-daily-batch" });
+
+/**
+ * Constant-time string comparison to prevent timing attacks
+ */
+function constantTimeCompare(a: string, b: string): boolean {
+	if (a.length !== b.length) return false;
+	return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 /**
  * GET /api/cron/daily-batch
@@ -42,36 +51,42 @@ export async function GET(request: Request) {
 			);
 		}
 
-		if (authHeader !== expectedAuth) {
+		if (!constantTimeCompare(authHeader ?? "", expectedAuth)) {
 			logger.warn({ authHeader }, "Unauthorized cron job attempt");
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		// Step 2: Idempotency check
+		// Step 2: Idempotency check (atomic via unique constraint)
 		const today = new Date().toISOString().split("T")[0] as string; // YYYY-MM-DD
 		const jobName = "daily-batch";
 
 		logger.info({ date: today, jobName }, "Starting cron job");
 
-		const existingLog = await db.cronLog.findUnique({
-			where: {
-				jobName_date: {
+		// Try to create the cron log entry atomically
+		// If it already exists, unique constraint will prevent duplicate execution
+		try {
+			await db.cronLog.create({
+				data: {
 					jobName,
 					date: today,
 				},
-			},
-		});
-
-		if (existingLog) {
-			logger.info(
-				{ date: today, executedAt: existingLog.executedAt },
-				"Cron job already executed today",
-			);
-			return NextResponse.json({
-				message: "Already executed today",
-				date: today,
-				executedAt: existingLog.executedAt,
 			});
+		} catch (createError) {
+			// Check if error is due to unique constraint violation
+			if (
+				createError &&
+				typeof createError === "object" &&
+				"code" in createError &&
+				createError.code === "P2002"
+			) {
+				logger.info({ date: today }, "Cron job already executed today");
+				return NextResponse.json({
+					message: "Already executed today",
+					date: today,
+				});
+			}
+			// If it's a different error, re-throw it
+			throw createError;
 		}
 
 		// Step 3: Collect costs from OpenAI
@@ -105,13 +120,8 @@ export async function GET(request: Request) {
 				date: today,
 			});
 
-			// Still log the execution so we don't retry immediately
-			await db.cronLog.create({
-				data: {
-					jobName,
-					date: today,
-				},
-			});
+			// Note: Cron log already created at the start (atomic idempotency check)
+			// So we don't retry immediately even on failure
 
 			return NextResponse.json(
 				{
@@ -123,14 +133,7 @@ export async function GET(request: Request) {
 			);
 		}
 
-		// Step 5: Log successful execution
-		await db.cronLog.create({
-			data: {
-				jobName,
-				date: today,
-			},
-		});
-
+		// Step 5: Complete (cron log already created at the start)
 		const duration = Date.now() - startTime;
 
 		logger.info(

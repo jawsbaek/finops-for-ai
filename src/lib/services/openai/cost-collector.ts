@@ -76,19 +76,22 @@ async function retryWithBackoff<T>(
 }
 
 /**
- * Fetch usage data from OpenAI API for a specific date
+ * Fetch usage data from OpenAI API for a specific date or URL
  *
  * @param apiKey - Decrypted OpenAI API key
- * @param date - Date to fetch usage for (YYYY-MM-DD format)
+ * @param dateOrUrl - Date to fetch usage for (YYYY-MM-DD format) or pagination URL
  * @returns OpenAI usage response
  */
 async function fetchOpenAIUsage(
 	apiKey: string,
-	date: string,
+	dateOrUrl: string,
 ): Promise<OpenAIUsageResponse> {
-	const url = `https://api.openai.com/v1/usage?date=${date}`;
+	// If it's a full URL (pagination), use it directly. Otherwise, construct the URL
+	const url = dateOrUrl.startsWith("http")
+		? dateOrUrl
+		: `https://api.openai.com/v1/usage?date=${dateOrUrl}`;
 
-	logger.info({ date, url }, "Fetching OpenAI usage data");
+	logger.info({ url }, "Fetching OpenAI usage data");
 
 	const response = await fetch(url, {
 		method: "GET",
@@ -104,6 +107,48 @@ async function fetchOpenAIUsage(
 	}
 
 	return (await response.json()) as OpenAIUsageResponse;
+}
+
+/**
+ * Fetch all usage data from OpenAI API with pagination support
+ *
+ * @param apiKey - Decrypted OpenAI API key
+ * @param date - Date to fetch usage for (YYYY-MM-DD format)
+ * @returns All usage data across all pages
+ */
+async function fetchOpenAIUsageComplete(
+	apiKey: string,
+	date: string,
+): Promise<OpenAIUsageData[]> {
+	const allData: OpenAIUsageData[] = [];
+	let currentUrl: string = date; // Start with date string
+	let hasMore = true;
+
+	while (hasMore) {
+		const response = await retryWithBackoff(() =>
+			fetchOpenAIUsage(apiKey, currentUrl),
+		);
+
+		allData.push(...response.data);
+
+		logger.info(
+			{
+				recordsInPage: response.data.length,
+				totalRecords: allData.length,
+				hasMore: response.has_more,
+			},
+			"Fetched OpenAI usage page",
+		);
+
+		// Check if there are more pages
+		if (response.has_more && response.next_page) {
+			currentUrl = response.next_page;
+		} else {
+			hasMore = false; // Exit loop
+		}
+	}
+
+	return allData;
 }
 
 /**
@@ -159,21 +204,22 @@ export async function collectDailyCosts(
 				),
 			);
 
-			// Fetch usage data from OpenAI with retry
-			const usageData = await retryWithBackoff(() =>
-				fetchOpenAIUsage(decryptedKey, dateString),
+			// Fetch usage data from OpenAI with retry and pagination support
+			const usageData = await fetchOpenAIUsageComplete(
+				decryptedKey,
+				dateString,
 			);
 
 			logger.info(
 				{
 					apiKeyId: apiKeyRecord.id,
-					recordsCount: usageData.data.length,
+					recordsCount: usageData.length,
 				},
 				"Fetched usage data",
 			);
 
 			// Transform OpenAI response to our cost data format
-			for (const usage of usageData.data) {
+			for (const usage of usageData) {
 				allCostData.push({
 					teamId: apiKeyRecord.teamId,
 					apiKeyId: apiKeyRecord.id,
@@ -196,6 +242,12 @@ export async function collectDailyCosts(
 				},
 				"Failed to collect costs for API key",
 			);
+		}
+
+		// Rate limiting: Wait 1 second between API calls to respect OpenAI limits
+		// OpenAI rate limit is 60 requests/second, but we add delay for safety
+		if (apiKeys.length > 1) {
+			await new Promise((resolve) => setTimeout(resolve, 1000));
 		}
 	}
 

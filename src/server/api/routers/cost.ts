@@ -6,6 +6,7 @@
  * - getRecentCosts: Get recent cost data for charts/analysis
  */
 
+import { TRPCError } from "@trpc/server";
 import { endOfDay, startOfWeek, subDays } from "date-fns";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -34,6 +35,17 @@ export const costRouter = createTRPCRouter({
 				where: { userId },
 				select: { teamId: true },
 			});
+
+			// If teamId is specified, verify user has access to it
+			if (input.teamId) {
+				const hasAccess = userTeams.some((tm) => tm.teamId === input.teamId);
+				if (!hasAccess) {
+					throw new TRPCError({
+						code: "FORBIDDEN",
+						message: "You do not have access to this team",
+					});
+				}
+			}
 
 			const teamIds = input.teamId
 				? [input.teamId]
@@ -139,6 +151,17 @@ export const costRouter = createTRPCRouter({
 				where: { userId },
 				select: { teamId: true },
 			});
+
+			// If teamId is specified, verify user has access to it
+			if (input.teamId) {
+				const hasAccess = userTeams.some((tm) => tm.teamId === input.teamId);
+				if (!hasAccess) {
+					throw new TRPCError({
+						code: "FORBIDDEN",
+						message: "You do not have access to this team",
+					});
+				}
+			}
 
 			const teamIds = input.teamId
 				? [input.teamId]
