@@ -40,6 +40,10 @@ interface TooltipEntry {
 	name: string;
 	value: number;
 	color: string;
+	payload?: {
+		timestamp: Date;
+		[key: string]: unknown;
+	};
 }
 
 interface CustomTooltipProps {
@@ -48,13 +52,17 @@ interface CustomTooltipProps {
 	label?: string;
 }
 
-const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 	if (!active || !payload?.length) return null;
+
+	// Use original timestamp from payload instead of re-parsing the formatted label
+	const timestamp = payload[0]?.payload?.timestamp;
+	if (!timestamp) return null;
 
 	return (
 		<Card className="p-3 shadow-lg">
 			<p className="mb-1 font-medium text-sm">
-				{format(new Date(label as string), "PPP", { locale: ko })}
+				{format(new Date(timestamp), "PPP", { locale: ko })}
 			</p>
 			{payload.map((entry) => (
 				<p key={entry.name} className="text-sm" style={{ color: entry.color }}>
