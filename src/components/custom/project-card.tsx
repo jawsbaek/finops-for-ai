@@ -31,7 +31,7 @@ export interface ProjectCardProps {
 
 const statusConfig = {
 	normal: {
-		borderClass: "border-neutral-700 hover:border-neutral-600",
+		borderClass: "border-border hover:border-border/80",
 		badgeVariant: "default" as const,
 		animation: "",
 	},
