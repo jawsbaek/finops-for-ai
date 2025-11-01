@@ -48,3 +48,6 @@ yarn-error.log*
 # IDE local settings
 .claude/settings.local.json
 .cursor/settings.local.json
+
+# worktrees
+.worktrees/
