@@ -14,6 +14,11 @@ pre-commit:
       run: bunx prisma format
       stage_fixed: true
 
+    validate-colors:
+      glob: "*.{js,ts,jsx,tsx}"
+      run: bun run validate:colors
+      fail_text: "❌ Color system validation failed. See docs/color-system-guidelines.md"
+
 pre-push:
   parallel: false
   commands:
