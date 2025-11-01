@@ -33,12 +33,15 @@ export default function ProjectDetailPage() {
 	const [successCount, setSuccessCount] = useState<string>("");
 	const [feedbackScore, setFeedbackScore] = useState<string>("");
 
+	// Get utils at component top level
+	const utils = api.useUtils();
+
 	// Update metrics mutation
 	const updateMetrics = api.project.updateMetrics.useMutation({
 		onSuccess: () => {
 			toast.success("성과 메트릭이 업데이트되었습니다");
 			// Refetch project data
-			void api.useUtils().project.getById.invalidate({ id: projectId });
+			void utils.project.getById.invalidate({ id: projectId });
 		},
 		onError: (error) => {
 			toast.error("성과 메트릭 업데이트 실패", {
@@ -90,10 +93,11 @@ export default function ProjectDetailPage() {
 
 	// Transform task type breakdown for chart
 	const taskTypeChartData: CostDataPoint[] = project?.costByTaskType
-		? Object.entries(project.costByTaskType).map(([taskType, cost]) => ({
-				timestamp: taskType,
+		? Object.entries(project.costByTaskType).map(([taskType, cost], index) => ({
+				timestamp: new Date(2025, 0, index + 1), // Valid date for chart compatibility
 				value: cost,
 				label: formatCurrency(cost),
+				name: taskType, // Override formatted date with task type label
 			}))
 		: [];
 

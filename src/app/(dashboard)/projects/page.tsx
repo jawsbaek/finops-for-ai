@@ -29,6 +29,9 @@ export default function ProjectsPage() {
 	// Fetch projects data
 	const { data: projects, isLoading } = api.project.getAll.useQuery();
 
+	// Get utils at component top level
+	const utils = api.useUtils();
+
 	// Create project mutation
 	const createProject = api.project.create.useMutation({
 		onSuccess: (project) => {
@@ -37,7 +40,7 @@ export default function ProjectsPage() {
 			setName("");
 			setDescription("");
 			// Refetch projects
-			void api.useUtils().project.getAll.invalidate();
+			void utils.project.getAll.invalidate();
 			// Navigate to project detail
 			router.push(`/projects/${project.id}`);
 		},
