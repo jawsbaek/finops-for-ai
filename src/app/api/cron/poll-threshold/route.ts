@@ -142,15 +142,37 @@ export async function GET(request: Request) {
 					);
 				}
 
-				// Update alert timestamp (throttling)
-				await updateAlertSentTimestamp(breach.alertId);
+				// Update alert timestamp only if at least one notification succeeded
+				// This prevents throttling when all delivery methods fail
+				const slackSuccess = slackResult.status === "fulfilled";
+				const emailSuccessCount = emailResults.filter(
+					(result) => result.status === "fulfilled",
+				).length;
+				const anySuccess = slackSuccess || emailSuccessCount > 0;
+
+				if (anySuccess) {
+					await updateAlertSentTimestamp(breach.alertId);
+					logger.info(
+						{
+							projectId: breach.projectId,
+							slackSuccess,
+							emailsSent: emailSuccessCount,
+						},
+						"Alert sent, timestamp updated",
+					);
+				} else {
+					logger.warn(
+						{
+							projectId: breach.projectId,
+						},
+						"All alert deliveries failed, skipping throttle update",
+					);
+				}
 
 				return {
 					projectId: breach.projectId,
-					slackSuccess: slackResult.status === "fulfilled",
-					emailsSent: emailResults.filter(
-						(result) => result.status === "fulfilled",
-					).length,
+					slackSuccess,
+					emailsSent: emailSuccessCount,
 					emailsFailed: failedEmails.length,
 				};
 			}),
