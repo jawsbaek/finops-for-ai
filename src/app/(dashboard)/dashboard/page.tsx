@@ -32,10 +32,10 @@ export default function DashboardPage() {
 	return (
 		<div className="space-y-6">
 			<div>
-				<h2 className="font-bold text-2xl text-gray-900">
+				<h2 className="font-bold text-2xl text-foreground">
 					Welcome to FinOps for AI
 				</h2>
-				<p className="mt-2 text-gray-600 text-sm">
+				<p className="mt-2 text-muted-foreground text-sm">
 					Track and optimize your AI infrastructure costs
 				</p>
 			</div>
@@ -79,11 +79,11 @@ export default function DashboardPage() {
 
 			{/* Data Status Info */}
 			{!isLoading && costSummary && (
-				<div className="rounded-lg bg-blue-50 p-4">
+				<div className="rounded-lg border border-info/30 bg-info/10 p-4">
 					<div className="flex">
 						<div className="flex-shrink-0">
 							<svg
-								className="h-5 w-5 text-blue-400"
+								className="h-5 w-5 text-info"
 								viewBox="0 0 20 20"
 								fill="currentColor"
 							>
@@ -96,7 +96,7 @@ export default function DashboardPage() {
 							</svg>
 						</div>
 						<div className="ml-3 flex-1">
-							<p className="text-blue-700 text-sm">
+							<p className="text-info-foreground text-sm">
 								<strong>Note:</strong> OpenAI API usage data is delayed by 8-24
 								hours. The cost shown here reflects usage from 1-2 days ago, not
 								real-time usage.
@@ -110,10 +110,10 @@ export default function DashboardPage() {
 			{!isLoading &&
 				costSummary?.yesterdayCost === 0 &&
 				costSummary?.thisWeekCost === 0 && (
-					<div className="rounded-lg border-2 border-gray-300 border-dashed p-12">
+					<div className="rounded-lg border-2 border-border border-dashed p-12">
 						<div className="text-center">
 							<svg
-								className="mx-auto h-12 w-12 text-gray-400"
+								className="mx-auto h-12 w-12 text-muted-foreground"
 								fill="none"
 								viewBox="0 0 24 24"
 								stroke="currentColor"
@@ -127,14 +127,14 @@ export default function DashboardPage() {
 									d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
 								/>
 							</svg>
-							<h3 className="mt-2 font-semibold text-gray-900 text-sm">
+							<h3 className="mt-2 font-semibold text-foreground text-sm">
 								No cost data yet
 							</h3>
-							<p className="mt-1 text-gray-500 text-sm">
+							<p className="mt-1 text-muted-foreground text-sm">
 								비용 데이터가 아직 없습니다. API 키를 설정하고 비용 수집을
 								기다리세요.
 							</p>
-							<p className="mt-2 text-gray-400 text-xs">
+							<p className="mt-2 text-muted-foreground/70 text-xs">
 								Data collection runs daily at 9am KST
 							</p>
 						</div>
