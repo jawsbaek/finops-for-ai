@@ -168,25 +168,25 @@ common_stacks:
 starter_templates:
   create_next_app:
     name: "Create Next App"
-    command_search: "npx create-next-app@latest"
+    command_search: "bunx create-next-app@latest"
     decisions_provided: ["Next.js framework", "TypeScript option", "App Router vs Pages", "Tailwind CSS option", "ESLint"]
     good_for: ["React web applications", "Full-stack apps", "SSR/SSG"]
 
   create_t3_app:
     name: "Create T3 App"
-    command_search: "npm create t3-app@latest"
+    command_search: "bun create t3-app@latest"
     decisions_provided: ["Next.js", "TypeScript", "tRPC", "Prisma", "NextAuth", "Tailwind CSS"]
     good_for: ["Type-safe full-stack apps"]
 
   create_vite:
     name: "Create Vite"
-    command_search: "npm create vite@latest"
+    command_search: "bun create vite@latest"
     decisions_provided: ["Framework choice (React/Vue/Svelte)", "TypeScript option", "Vite bundler"]
     good_for: ["Fast dev SPAs", "Library development"]
 
   create_remix:
     name: "Create Remix"
-    command_search: "npx create-remix@latest"
+    command_search: "bunx create-remix@latest"
     decisions_provided: ["Remix framework", "TypeScript option", "Deployment target", "CSS solution"]
     good_for: ["Web standards", "Nested routing", "Progressive enhancement"]
 
@@ -198,7 +198,7 @@ starter_templates:
 
   create_expo_app:
     name: "Create Expo App"
-    command_search: "npx create-expo-app"
+    command_search: "bunx create-expo-app"
     decisions_provided: ["React Native", "Expo SDK", "TypeScript option", "Navigation option"]
     good_for: ["Cross-platform mobile", "React Native apps"]
 

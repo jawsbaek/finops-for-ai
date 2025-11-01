@@ -1,0 +1,424 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1</storyId>
+    <title>프로젝트 인프라 및 기본 인증 구축</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-01</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-1-프로젝트-인프라-및-기본-인증-구축.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>시스템 관리자</asA>
+    <iWant>안전한 프로젝트 인프라와 기본 사용자 인증을 구축하고</iWant>
+    <soThat>팀원들이 안전하게 시스템에 접근하고 비용 데이터를 관리할 수 있다</soThat>
+    <tasks>
+- Task 1: T3 Stack 프로젝트 초기화 및 Vercel 배포 설정
+  - bun create t3-app 실행 (--nextAuth --prisma --trpc --tailwind --typescript)
+  - GitHub 저장소 생성 및 코드 푸시
+  - Vercel 프로젝트 생성 및 GitHub 연동
+  - Neon PostgreSQL 데이터베이스 생성 및 DATABASE_URL 환경변수 설정
+  - Vercel 환경변수 설정 (DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL)
+  - 초기 배포 확인 및 HTTPS 연결 테스트
+
+- Task 2: Prisma 스키마 정의 및 데이터베이스 마이그레이션
+  - User, Session, Team, TeamMember, Project 모델 정의
+  - ApiKey 모델 정의 (KMS 암호화 필드 포함: encrypted_key, encrypted_data_key, iv)
+  - prisma migrate dev 실행하여 로컬 DB 테이블 생성
+  - prisma migrate deploy 실행하여 Neon DB 테이블 생성
+  - Prisma Studio로 테이블 생성 확인
+
+- Task 3: NextAuth 인증 시스템 구현
+  - src/server/auth.ts에 NextAuth 설정 (Credentials provider)
+  - src/server/api/routers/auth.ts에 signup 프로시저 생성 (bcrypt 해싱)
+  - src/server/api/routers/auth.ts에 login 프로시저 생성 (JWT 발급)
+  - tRPC 미들웨어에 protectedProcedure 추가 (JWT 검증)
+  - 단위 테스트: 회원가입, 로그인, JWT 검증 (Vitest)
+
+- Task 4: 로그인/회원가입 UI 구현
+  - src/app/(auth)/login/page.tsx 생성 (shadcn/ui Form + Zod validation)
+  - src/app/(auth)/signup/page.tsx 생성
+  - tRPC useQuery/useMutation으로 auth API 연결
+  - 로그인 성공 시 /dashboard로 리다이렉트
+  - E2E 테스트: 회원가입 → 로그인 → 대시보드 접근 (Playwright)
+
+- Task 5: 홈 대시보드 뼈대 구현
+  - src/app/(dashboard)/page.tsx 생성 (인증 필수)
+  - 기본 레이아웃: 헤더, 사이드바, 메인 콘텐츠 영역
+  - "비용 데이터가 아직 없습니다" 플레이스홀더 표시
+  - 로그아웃 버튼 추가
+  - 접근성 테스트: WCAG 2.1 AA 기준 (jest-axe)
+
+- Task 6: CI/CD 파이프라인 설정 및 보안 검증
+  - .github/workflows/ci.yml 생성 (Vitest + Playwright 실행)
+  - Vercel 자동 배포 확인 (PR → Preview Deploy, Main → Production)
+  - TLS 1.3 연결 확인 (SSL Labs 테스트)
+  - 보안 헤더 설정 (Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options)
+  - 통합 테스트: 전체 배포 파이프라인 실행
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. PostgreSQL 데이터베이스가 구축되고, users, projects, api_keys 테이블이 생성되어야 한다
+2. 이메일/비밀번호 기반 회원가입 및 로그인 API가 작동해야 한다 (JWT 토큰 발급)
+3. 기본 웹 UI가 배포되어야 한다 (로그인 페이지, 홈 화면 뼈대)
+4. HTTPS 연결이 설정되어야 한다 (TLS 1.3, NFR005)
+5. CI/CD 파이프라인이 구축되어 코드 푸시 시 자동 테스트 및 배포가 되어야 한다
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: 프로젝트 기반 및 OpenAI 비용 관리 시스템</title>
+        <section>Data Models and Contracts</section>
+        <snippet>Prisma schema definitions for User, Session, Team, Project, ApiKey models. Includes KMS encryption fields (encrypted_key, encrypted_data_key, iv) for API keys. NextAuth JWT-based authentication implementation.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification</title>
+        <section>APIs and Interfaces</section>
+        <snippet>tRPC authRouter with signup/login procedures. bcrypt password hashing (10 rounds), JWT token generation. protectedProcedure middleware for authentication enforcement.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Test Strategy Summary</section>
+        <snippet>Unit tests (Vitest, 80% coverage), Integration tests (Vitest + MSW), E2E tests (Playwright for Chrome/Safari/Mobile), Accessibility tests (jest-axe, WCAG 2.1 AA).</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture - finops-for-ai</title>
+        <section>Project Initialization</section>
+        <snippet>T3 Stack setup command: bun create t3-app@latest finops-for-ai -- --nextAuth --prisma --trpc --tailwind --typescript. Automatically configures Next.js 16, tRPC v11, Prisma 6, NextAuth v5, Tailwind CSS.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Project Structure</section>
+        <snippet>Canonical T3 Stack file structure: src/app/(auth)/ for login/signup, src/server/api/routers/ for tRPC, prisma/schema.prisma for models, .github/workflows/ for CI/CD. Vercel deployment with Neon PostgreSQL.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Security Architecture</section>
+        <snippet>NextAuth v5 JWT authentication (httpOnly cookie, 30-day expiration). bcrypt password hashing (10 rounds). TLS 1.3 via Vercel. Security headers: Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>Decision Architecture</title>
+        <section>Deployment Architecture</section>
+        <snippet>Vercel configuration with environment variables (DATABASE_URL, NEXTAUTH_SECRET, AWS_KMS_CMK_ID). GitHub auto-deployment. Neon PostgreSQL serverless connection pooling.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Non-Functional Requirements</section>
+        <snippet>NFR001: Dashboard loading <3s (P95). NFR004: AES-256 encryption for credentials. NFR005: TLS 1.3 for all communications. NFR003: 99.5% uptime.</snippet>
+      </artifact>
+    </docs>
+    <code>
+      <!-- No existing code - this is the first story establishing the project infrastructure -->
+    </code>
+    <dependencies>
+      <ecosystem name="Node.js/bun">
+        <note>T3 Stack initialization will create package.json with these core dependencies</note>
+        <package name="next" version="^16.0.0" category="framework">Next.js App Router framework</package>
+        <package name="react" version="^18.2.0" category="framework">React library</package>
+        <package name="typescript" version="^5.1.0" category="language">TypeScript compiler</package>
+
+        <!-- tRPC stack -->
+        <package name="@trpc/server" version="^11.7.1" category="api">tRPC server</package>
+        <package name="@trpc/client" version="^11.7.1" category="api">tRPC client</package>
+        <package name="@trpc/react-query" version="^11.7.1" category="api">tRPC React Query integration</package>
+        <package name="@trpc/next" version="^11.7.1" category="api">tRPC Next.js integration</package>
+
+        <!-- Database -->
+        <package name="prisma" version="^6.16.3" category="database">Prisma CLI</package>
+        <package name="@prisma/client" version="^6.16.3" category="database">Prisma ORM client</package>
+
+        <!-- Authentication -->
+        <package name="next-auth" version="^5.0.0" category="auth">NextAuth v5 (Auth.js)</package>
+        <package name="bcrypt" version="^5.1.1" category="auth">Password hashing</package>
+        <package name="@types/bcrypt" version="^5.0.0" category="types">bcrypt TypeScript types</package>
+
+        <!-- Styling -->
+        <package name="tailwindcss" version="^3.4.0" category="ui">Tailwind CSS</package>
+        <package name="@radix-ui/react-*" version="latest" category="ui">Radix UI primitives for shadcn/ui</package>
+        <package name="lucide-react" version="latest" category="ui">Icon library</package>
+
+        <!-- Data visualization -->
+        <package name="recharts" version="^2.12.0" category="charts">Charting library</package>
+        <package name="@tanstack/react-table" version="^8.20.0" category="ui">Data tables</package>
+        <package name="@tanstack/react-query" version="^5.0.0" category="data">React Query (tRPC internal)</package>
+
+        <!-- AWS integration -->
+        <package name="@aws-sdk/client-kms" version="^3.901.0" category="cloud">AWS KMS for encryption</package>
+
+        <!-- Email -->
+        <package name="resend" version="^4.0.0" category="email">Resend email service</package>
+        <package name="react-email" version="^3.0.0" category="email">React Email templates</package>
+
+        <!-- Utilities -->
+        <package name="zod" version="^3.22.0" category="validation">Schema validation</package>
+        <package name="date-fns" version="^3.0.0" category="utils">Date utilities</package>
+        <package name="pino" version="^9.0.0" category="logging">Structured logging</package>
+
+        <!-- Monitoring -->
+        <package name="@sentry/nextjs" version="^8.0.0" category="monitoring">Error tracking</package>
+
+        <!-- Testing (devDependencies) -->
+        <package name="playwright" version="^1.49.0" category="testing">E2E testing</package>
+        <package name="vitest" version="^2.0.0" category="testing">Unit testing</package>
+        <package name="@testing-library/react" version="^16.0.0" category="testing">React testing utilities</package>
+        <package name="eslint" version="^8.57.0" category="dev">Code linting</package>
+        <package name="prettier" version="^3.2.0" category="dev">Code formatting</package>
+        <package name="jest-axe" version="^9.0.0" category="testing">Accessibility testing</package>
+      </ecosystem>
+
+      <runtime>
+        <requirement name="Node.js" version="18.x or 20.x">Required for Next.js 16</requirement>
+        <requirement name="PostgreSQL" version="14+">Provided by Neon (serverless)</requirement>
+      </runtime>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>
+      <category>Architecture Pattern</category>
+      <description>Must use T3 Stack (Next.js 16 App Router + tRPC v11 + Prisma 6 + NextAuth v5 + Tailwind CSS). Project initialization command: bun create t3-app@latest finops-for-ai -- --nextAuth --prisma --trpc --tailwind --typescript</description>
+    </constraint>
+    <constraint>
+      <category>Security - Password</category>
+      <description>Password hashing: bcrypt with 10 rounds (ADR-002). Never store plaintext passwords.</description>
+    </constraint>
+    <constraint>
+      <category>Security - Session</category>
+      <description>NextAuth JWT (httpOnly cookie, 30-day expiration). Session token must be secure and auto-refreshed.</description>
+    </constraint>
+    <constraint>
+      <category>Security - Transport</category>
+      <description>TLS 1.3 required (NFR005). Vercel provides automatically. Must set security headers: Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options.</description>
+    </constraint>
+    <constraint>
+      <category>Security - API Keys</category>
+      <description>AWS KMS Envelope Encryption for API key storage (encrypted_key, encrypted_data_key, iv fields). Never store plaintext API keys in database.</description>
+    </constraint>
+    <constraint>
+      <category>Deployment</category>
+      <description>Vercel hosting with automatic CI/CD from GitHub. Neon PostgreSQL for database (serverless, connection pooling).</description>
+    </constraint>
+    <constraint>
+      <category>Performance</category>
+      <description>NFR001: Dashboard loading time &lt;3s (P95). Use Next.js SSR + React Query caching. Database indexes on users(email), sessions(userId).</description>
+    </constraint>
+    <constraint>
+      <category>Testing</category>
+      <description>80% unit test coverage (Vitest). E2E tests for user journeys (Playwright). Accessibility tests (jest-axe, WCAG 2.1 AA).</description>
+    </constraint>
+    <constraint>
+      <category>Project Structure</category>
+      <description>Follow T3 Stack conventions: (auth) and (dashboard) route groups in src/app/, tRPC routers in src/server/api/routers/, Prisma client in src/server/db.ts.</description>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>authRouter.signup</name>
+      <kind>tRPC mutation</kind>
+      <signature>
+        signup: publicProcedure
+          .input(z.object({
+            email: z.string().email(),
+            password: z.string().min(8),
+            name: z.string().optional()
+          }))
+          .mutation(async ({ input, ctx }) => { /* bcrypt hash + create user + return JWT */ })
+      </signature>
+      <path>src/server/api/routers/auth.ts</path>
+    </interface>
+    <interface>
+      <name>authRouter.login</name>
+      <kind>tRPC mutation</kind>
+      <signature>
+        login: publicProcedure
+          .input(z.object({
+            email: z.string().email(),
+            password: z.string()
+          }))
+          .mutation(async ({ input, ctx }) => { /* verify password + return JWT */ })
+      </signature>
+      <path>src/server/api/routers/auth.ts</path>
+    </interface>
+    <interface>
+      <name>User (Prisma Model)</name>
+      <kind>Database schema</kind>
+      <signature>
+        model User {
+          id: String @id @default(cuid())
+          email: String @unique
+          password_hash: String
+          name: String?
+          created_at: DateTime @default(now())
+          updated_at: DateTime @updatedAt
+          sessions: Session[]
+          teams: TeamMember[]
+        }
+      </signature>
+      <path>prisma/schema.prisma</path>
+    </interface>
+    <interface>
+      <name>Session (Prisma Model)</name>
+      <kind>Database schema</kind>
+      <signature>
+        model Session {
+          id: String @id @default(cuid())
+          session_token: String @unique
+          user_id: String
+          expires: DateTime
+          user: User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+        }
+      </signature>
+      <path>prisma/schema.prisma</path>
+    </interface>
+    <interface>
+      <name>ApiKey (Prisma Model)</name>
+      <kind>Database schema</kind>
+      <signature>
+        model ApiKey {
+          id: String @id @default(cuid())
+          team_id: String
+          provider: String
+          encrypted_key: String @db.Text
+          encrypted_data_key: String @db.Text
+          iv: String
+          is_active: Boolean @default(true)
+          created_at: DateTime @default(now())
+        }
+      </signature>
+      <path>prisma/schema.prisma</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      This story establishes the testing infrastructure for the entire project. Follow T3 Stack testing conventions with Vitest for unit/integration tests and Playwright for E2E tests.
+
+      **Unit Tests (Vitest):**
+      - Target: 80% code coverage minimum
+      - Focus: Auth router procedures (signup, login, JWT generation)
+      - Mock: Prisma client using Vitest mock utilities
+      - Location: __tests__/unit/ directory
+
+      **Integration Tests (Vitest + MSW):**
+      - Target: tRPC procedures with actual Prisma interactions
+      - Mock: External services (email, KMS) using MSW
+      - Test database transactions and error handling
+
+      **E2E Tests (Playwright):**
+      - Browsers: Chrome, Safari, Mobile (iPhone 13)
+      - Scenarios: Complete user journeys (signup → login → dashboard)
+      - Screenshot/video on failure
+      - Location: __tests__/e2e/ directory
+
+      **Accessibility Tests (jest-axe):**
+      - Standard: WCAG 2.1 AA compliance
+      - Target: Lighthouse Accessibility score 95+
+      - Test all auth pages (login, signup)
+      - Keyboard navigation and screen reader compatibility
+    </standards>
+
+    <locations>
+      <location>__tests__/unit/auth.test.ts</location>
+      <location>__tests__/integration/auth.test.ts</location>
+      <location>__tests__/e2e/auth-journey.spec.ts</location>
+      <location>__tests__/accessibility/auth-pages.test.ts</location>
+    </locations>
+
+    <ideas>
+      <test id="AC1" acceptance_criteria="1">
+        <name>Database tables creation verification</name>
+        <type>Integration</type>
+        <description>Run Prisma migration and verify users, sessions, teams, projects, api_keys tables exist in Neon database. Check schema constraints (unique email, foreign keys, indexes).</description>
+      </test>
+
+      <test id="AC2.1" acceptance_criteria="2">
+        <name>User signup with valid credentials</name>
+        <type>Unit</type>
+        <description>Call authRouter.signup with valid email/password. Verify user created in DB with bcrypt hashed password (not plaintext). Verify JWT token returned.</description>
+      </test>
+
+      <test id="AC2.2" acceptance_criteria="2">
+        <name>User login with correct password</name>
+        <type>Unit</type>
+        <description>Create user via signup, then call authRouter.login. Verify bcrypt password comparison succeeds and JWT token is returned.</description>
+      </test>
+
+      <test id="AC2.3" acceptance_criteria="2">
+        <name>User login with incorrect password</name>
+        <type>Unit</type>
+        <description>Call authRouter.login with wrong password. Verify authentication fails with appropriate error message.</description>
+      </test>
+
+      <test id="AC2.4" acceptance_criteria="2">
+        <name>JWT token validation</name>
+        <type>Unit</type>
+        <description>Generate JWT via login, then call protectedProcedure with token. Verify session validation succeeds and user context is available.</description>
+      </test>
+
+      <test id="AC3.1" acceptance_criteria="3">
+        <name>Login page renders and validates</name>
+        <type>E2E</type>
+        <description>Navigate to /login. Verify form renders with email/password fields. Test Zod validation (invalid email shows error). Submit valid credentials and verify redirect to /dashboard.</description>
+      </test>
+
+      <test id="AC3.2" acceptance_criteria="3">
+        <name>Signup page creates account</name>
+        <type>E2E</type>
+        <description>Navigate to /signup. Fill form with new email/password. Submit and verify account creation. Verify auto-login and redirect to /dashboard.</description>
+      </test>
+
+      <test id="AC3.3" acceptance_criteria="3">
+        <name>Dashboard skeleton displays</name>
+        <type>E2E</type>
+        <description>After login, verify /dashboard page loads with header, sidebar, main content area. Check "비용 데이터가 아직 없습니다" placeholder displays. Verify logout button exists.</description>
+      </test>
+
+      <test id="AC3.4" acceptance_criteria="3">
+        <name>Unauthenticated access redirects</name>
+        <type>E2E</type>
+        <description>Navigate to /dashboard without login. Verify redirect to /login page. After login, verify redirect back to originally requested page.</description>
+      </test>
+
+      <test id="AC4.1" acceptance_criteria="4">
+        <name>HTTPS/TLS verification</name>
+        <type>Manual</type>
+        <description>After Vercel deployment, use SSL Labs (ssllabs.com/ssltest) to verify TLS 1.3 is enabled. Check certificate validity and security headers (Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options).</description>
+      </test>
+
+      <test id="AC5.1" acceptance_criteria="5">
+        <name>CI pipeline runs tests</name>
+        <type>Integration</type>
+        <description>Push code to GitHub. Verify .github/workflows/ci.yml triggers. Check Vitest unit tests run and pass. Check Playwright E2E tests run on PR preview deploy.</description>
+      </test>
+
+      <test id="AC5.2" acceptance_criteria="5">
+        <name>Vercel auto-deployment</name>
+        <type>Integration</type>
+        <description>Merge PR to main branch. Verify Vercel automatically deploys to production. Check deployment succeeds and app is accessible at production URL.</description>
+      </test>
+
+      <test id="ACCESSIBILITY.1" acceptance_criteria="3">
+        <name>Login page accessibility</name>
+        <type>Accessibility</type>
+        <description>Run jest-axe on /login page. Verify WCAG 2.1 AA compliance (no violations). Test keyboard navigation (Tab order correct, Enter submits form). Test with screen reader (labels announced correctly).</description>
+      </test>
+
+      <test id="ACCESSIBILITY.2" acceptance_criteria="3">
+        <name>Dashboard accessibility</name>
+        <type>Accessibility</type>
+        <description>Run Lighthouse on /dashboard. Verify Accessibility score ≥95. Check color contrast ratios meet AA standard. Verify all interactive elements have focus indicators.</description>
+      </test>
+    </ideas>
+  </tests>
+</story-context>

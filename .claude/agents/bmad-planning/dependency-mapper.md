@@ -12,7 +12,7 @@ You specialize in module dependency graphing, package relationship analysis, ext
 
 ## Analysis Methodology
 
-Begin by identifying the dependency management system (npm, pip, maven, go modules, etc.). Extract declared dependencies from manifest files. Trace actual usage through import/require statements. Map internal module dependencies through code analysis. Identify runtime vs build-time dependencies. Detect hidden dependencies not declared in manifests. Analyze dependency depth and transitive dependencies.
+Begin by identifying the dependency management system (bun, pip, maven, go modules, etc.). Extract declared dependencies from manifest files. Trace actual usage through import/require statements. Map internal module dependencies through code analysis. Identify runtime vs build-time dependencies. Detect hidden dependencies not declared in manifests. Analyze dependency depth and transitive dependencies.
 
 ## Discovery Techniques
 

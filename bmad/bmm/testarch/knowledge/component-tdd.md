@@ -443,7 +443,7 @@ export default defineConfig({
 });
 
 // Update snapshots when intentional changes are made
-// npx playwright test --update-snapshots
+// bunx playwright test --update-snapshots
 ```
 
 **Key Points**:

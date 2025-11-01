@@ -294,16 +294,16 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun ci
 
       - name: Start database
         run: docker-compose up -d postgres
 
       - name: Run migrations
-        run: npm run db:migrate
+        run: bun run db:migrate
 
       - name: Verify pacts
-        run: npm run test:contract:provider
+        run: bun run test:contract:provider
         env:
           PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
           PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
@@ -312,7 +312,7 @@ jobs:
 
       - name: Can I Deploy?
         run: |
-          npx pact-broker can-i-deploy \
+          bunx pact-broker can-i-deploy \
             --pacticipant user-api-service \
             --version ${{ github.sha }} \
             --to-environment production
@@ -357,15 +357,15 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun ci
 
       - name: Run consumer contract tests
-        run: npm run test:contract
+        run: bun run test:contract
 
       - name: Publish pacts to broker
         if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
         run: |
-          npx pact-broker publish ./pacts \
+          bunx pact-broker publish ./pacts \
             --consumer-app-version ${{ github.sha }} \
             --branch ${{ github.head_ref || github.ref_name }} \
             --broker-base-url ${{ secrets.PACT_BROKER_URL }} \
@@ -374,7 +374,7 @@ jobs:
       - name: Tag pact with environment (main branch only)
         if: github.ref == 'refs/heads/main'
         run: |
-          npx pact-broker create-version-tag \
+          bunx pact-broker create-version-tag \
             --pacticipant user-management-web \
             --version ${{ github.sha }} \
             --tag production \
@@ -404,13 +404,13 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun ci
 
       - name: Start dependencies
         run: docker-compose up -d
 
       - name: Run provider verification
-        run: npm run test:contract:provider
+        run: bun run test:contract:provider
         env:
           PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
           PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
@@ -424,7 +424,7 @@ jobs:
       - name: Can I Deploy to Production?
         if: github.ref == 'refs/heads/main'
         run: |
-          npx pact-broker can-i-deploy \
+          bunx pact-broker can-i-deploy \
             --pacticipant user-api-service \
             --version ${{ github.sha }} \
             --to-environment production \
@@ -436,7 +436,7 @@ jobs:
       - name: Record deployment (if can-i-deploy passed)
         if: success() && github.ref == 'refs/heads/main'
         run: |
-          npx pact-broker record-deployment \
+          bunx pact-broker record-deployment \
             --pacticipant user-api-service \
             --version ${{ github.sha }} \
             --environment production \
@@ -750,7 +750,7 @@ function tagRelease(version: string, environment: 'staging' | 'production') {
   console.log(`🏷️  Tagging ${PACTICIPANT} v${version} as ${environment}`);
 
   execSync(
-    `npx pact-broker create-version-tag \
+    `bunx pact-broker create-version-tag \
       --pacticipant ${PACTICIPANT} \
       --version ${version} \
       --tag ${environment} \
@@ -767,7 +767,7 @@ function recordDeployment(version: string, environment: 'staging' | 'production'
   console.log(`📝 Recording deployment of ${PACTICIPANT} v${version} to ${environment}`);
 
   execSync(
-    `npx pact-broker record-deployment \
+    `bunx pact-broker record-deployment \
       --pacticipant ${PACTICIPANT} \
       --version ${version} \
       --environment ${environment} \
@@ -785,7 +785,7 @@ function cleanupOldPacts() {
   console.log(`🧹 Cleaning up old pacts for ${PACTICIPANT}`);
 
   execSync(
-    `npx pact-broker clean \
+    `bunx pact-broker clean \
       --pacticipant ${PACTICIPANT} \
       --broker-base-url ${PACT_BROKER_URL} \
       --broker-token ${PACT_BROKER_TOKEN} \
@@ -803,7 +803,7 @@ function canIDeploy(version: string, toEnvironment: string): boolean {
 
   try {
     execSync(
-      `npx pact-broker can-i-deploy \
+      `bunx pact-broker can-i-deploy \
         --pacticipant ${PACTICIPANT} \
         --version ${version} \
         --to-environment ${toEnvironment} \
@@ -884,7 +884,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check pact compatibility
-        run: npm run pact:can-deploy ${{ github.ref_name }} production
+        run: bun run pact:can-deploy ${{ github.ref_name }} production
         env:
           PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
           PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
@@ -897,7 +897,7 @@ jobs:
         run: ./scripts/deploy.sh production
 
       - name: Record deployment in Pact Broker
-        run: npm run pact:record ${{ github.ref_name }} production
+        run: bun run pact:record ${{ github.ref_name }} production
         env:
           PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
           PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
@@ -919,7 +919,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Cleanup old pacts
-        run: npm run pact:cleanup
+        run: bun run pact:cleanup
         env:
           PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
           PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}

@@ -409,7 +409,7 @@ Maps each failing test to concrete implementation tasks:
 - [ ] Integrate authentication API
 - [ ] Add `data-testid` attributes: `email-input`, `password-input`, `login-button`
 - [ ] Implement error handling
-- [ ] Run test: `npm run test:e2e -- login.spec.ts`
+- [ ] Run test: `bun run test:e2e -- login.spec.ts`
 - [ ] ✅ Test passes (green phase)
 ```
 
@@ -598,7 +598,7 @@ As a user, I want to log in with email and password so that I can access my pers
 - [ ] Add email/password validation
 - [ ] Integrate authentication API
 - [ ] Add data-testid attributes: `email-input`, `password-input`, `login-button`
-- [ ] Run test: `npm run test:e2e -- user-authentication.spec.ts`
+- [ ] Run test: `bun run test:e2e -- user-authentication.spec.ts`
 - [ ] ✅ Test passes (green phase)
 
 ### Test: Display Error for Invalid Credentials
@@ -606,7 +606,7 @@ As a user, I want to log in with email and password so that I can access my pers
 - [ ] Add error state management
 - [ ] Display error message UI
 - [ ] Add `data-testid="error-message"`
-- [ ] Run test: `npm run test:e2e -- user-authentication.spec.ts`
+- [ ] Run test: `bun run test:e2e -- user-authentication.spec.ts`
 - [ ] ✅ Test passes (green phase)
 
 ### Test: Redirect to Dashboard After Login
@@ -614,23 +614,23 @@ As a user, I want to log in with email and password so that I can access my pers
 - [ ] Implement redirect logic after successful auth
 - [ ] Verify authentication token stored
 - [ ] Add dashboard route protection
-- [ ] Run test: `npm run test:e2e -- user-authentication.spec.ts`
+- [ ] Run test: `bun run test:e2e -- user-authentication.spec.ts`
 - [ ] ✅ Test passes (green phase)
 
 ## Running Tests
 
 ```bash
 # Run all failing tests
-npm run test:e2e
+bun run test:e2e
 
 # Run specific test file
-npm run test:e2e -- user-authentication.spec.ts
+bun run test:e2e -- user-authentication.spec.ts
 
 # Run tests in headed mode (see browser)
-npm run test:e2e -- --headed
+bun run test:e2e -- --headed
 
 # Debug specific test
-npm run test:e2e -- user-authentication.spec.ts --debug
+bun run test:e2e -- user-authentication.spec.ts --debug
 ```
 ````
 
@@ -661,7 +661,7 @@ npm run test:e2e -- user-authentication.spec.ts --debug
 ## Next Steps
 
 1. Review this checklist with team
-2. Run failing tests to confirm RED phase: `npm run test:e2e`
+2. Run failing tests to confirm RED phase: `bun run test:e2e`
 3. Begin implementation using checklist as guide
 4. Share progress in daily standup
 5. When all tests pass, run `bmad sm story-done` to move story to DONE

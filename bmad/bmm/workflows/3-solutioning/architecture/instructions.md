@@ -177,7 +177,7 @@ I see {{epic_count}} epics with {{story_count}} total stories.
 
       <action>Document the initialization command:
         Store command: {{full_starter_command_with_options}}
-        Example: "npx create-next-app@latest my-app --typescript --tailwind --app"
+        Example: "bunx create-next-app@latest my-app --typescript --tailwind --app"
       </action>
 
       <action>Extract and document starter-provided decisions:

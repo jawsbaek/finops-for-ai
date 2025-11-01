@@ -62,10 +62,10 @@ export default defineConfig({
 ```bash
 # After test failure in CI, download trace artifact
 # Then open locally:
-npx playwright show-trace path/to/trace.zip
+bunx playwright show-trace path/to/trace.zip
 
 # Or serve trace viewer:
-npx playwright show-report
+bunx playwright show-report
 ```
 
 **Key Features to Use in Trace Viewer**:
@@ -257,10 +257,10 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun ci
 
       - name: Run Playwright tests
-        run: npm run test:e2e
+        run: bun run test:e2e
         continue-on-error: true # Capture artifacts even on failure
 
       - name: Upload test artifacts on failure
@@ -427,16 +427,16 @@ test('debug checkout flow step-by-step', async ({ page }) => {
 
 ```bash
 # Open Playwright Inspector (GUI debugger)
-npx playwright test --debug
+bunx playwright test --debug
 
 # Or use headed mode with slowMo
-npx playwright test --headed --slow-mo=1000
+bunx playwright test --headed --slow-mo=1000
 
 # Debug specific test
-npx playwright test checkout-debug.spec.ts --debug
+bunx playwright test checkout-debug.spec.ts --debug
 
 # Set environment variable for persistent debugging
-PWDEBUG=1 npx playwright test
+PWDEBUG=1 bunx playwright test
 ```
 
 **Inspector Features**:
@@ -511,7 +511,7 @@ Before deploying tests to CI, ensure:
 - [ ] **HAR recording**: Set up for flaky API tests (record once, replay deterministically)
 - [ ] **Custom debug fixtures**: Console logs + network summary captured on failure
 - [ ] **Accessibility integration**: axe-core violations visible in trace viewer
-- [ ] **Trace viewer docs**: README explains how to open traces locally (`npx playwright show-trace`)
+- [ ] **Trace viewer docs**: README explains how to open traces locally (`bunx playwright show-trace`)
 - [ ] **Inspector workflow**: Document `--debug` flag for interactive debugging
 - [ ] **Storage optimization**: Artifacts deleted after 30 days (CI retention policy)
 

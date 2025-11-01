@@ -90,7 +90,7 @@ export default defineConfig({
     video: 'off', // No video locally for speed
   },
   webServer: {
-    command: 'npm run dev',
+    command: 'bun run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
@@ -346,13 +346,13 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: bunx playwright install --with-deps
 
       - name: Run tests
-        run: npm run test
+        run: bun run test
         env:
           TEST_ENV: staging
 
@@ -459,13 +459,13 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: bunx playwright install --with-deps
 
       - name: Run tests (shard ${{ matrix.shard }})
-        run: npm run test
+        run: bun run test
         env:
           SHARD_INDEX: ${{ matrix.shard }}
           SHARD_TOTAL: 4
@@ -645,15 +645,15 @@ export default globalSetup;
 
 ```bash
 # Run specific project
-npx playwright test --project=chromium
-npx playwright test --project=mobile-chrome
-npx playwright test --project=authenticated
+bunx playwright test --project=chromium
+bunx playwright test --project=mobile-chrome
+bunx playwright test --project=authenticated
 
 # Run multiple projects
-npx playwright test --project=chromium --project=firefox
+bunx playwright test --project=chromium --project=firefox
 
 # Run all projects (default)
-npx playwright test
+bunx playwright test
 ```
 
 ```typescript
@@ -688,11 +688,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-      - run: npm ci
-      - run: npx playwright install --with-deps
+      - run: bun ci
+      - run: bunx playwright install --with-deps
 
       - name: Run tests (${{ matrix.project }})
-        run: npx playwright test --project=${{ matrix.project }}
+        run: bunx playwright test --project=${{ matrix.project }}
 ```
 
 **Key Points**:

@@ -323,13 +323,13 @@ test.describe('Checkout Flow', () => {
 
 ```bash
 # P0 only (smoke tests, 2-5 min)
-npx playwright test --grep @p0
+bunx playwright test --grep @p0
 
 # P0 + P1 (core functionality, 10-15 min)
-npx playwright test --grep "@p0|@p1"
+bunx playwright test --grep "@p0|@p1"
 
 # Full regression (all priorities, 30+ min)
-npx playwright test
+bunx playwright test
 ```
 
 ---

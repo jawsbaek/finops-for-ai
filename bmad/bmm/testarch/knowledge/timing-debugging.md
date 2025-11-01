@@ -318,8 +318,8 @@ test('inspect network timing with trace viewer', async ({ page }) => {
   await page.goto('/dashboard');
 
   // Generate trace for analysis
-  // npx playwright test --trace on
-  // npx playwright show-trace trace.zip
+  // bunx playwright test --trace on
+  // bunx playwright show-trace trace.zip
 
   // In trace viewer:
   // 1. Check Network tab for API call timing
@@ -333,7 +333,7 @@ test('inspect network timing with trace viewer', async ({ page }) => {
 
 ```typescript
 test('use trace viewer to debug timing', async ({ page }) => {
-  // Run with trace: npx playwright test --trace on
+  // Run with trace: bunx playwright test --trace on
 
   await page.goto('/checkout');
   await page.getByTestId('submit').click();

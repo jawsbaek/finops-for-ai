@@ -41,14 +41,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ${{ env.NODE_VERSION_FILE }}
-          cache: 'npm'
+          cache: 'bun'
 
       - name: Cache node modules
         uses: actions/cache@v4
-        id: npm-cache
+        id: bun-cache
         with:
           path: |
-            ~/.npm
+            ~/.bun
             node_modules
             ~/.cache/Cypress
             ~/.cache/ms-playwright
@@ -57,12 +57,12 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Install dependencies
-        if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: npm ci --prefer-offline --no-audit
+        if: steps.bun-cache.outputs.cache-hit != 'true'
+        run: bun ci --prefer-offline --no-audit
 
       - name: Install Playwright browsers
-        if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        if: steps.bun-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
 
   test-changed-specs:
     name: Test Changed Specs First (Burn-In)
@@ -79,13 +79,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ${{ env.NODE_VERSION_FILE }}
-          cache: 'npm'
+          cache: 'bun'
 
       - name: Restore dependencies
         uses: actions/cache@v4
         with:
           path: |
-            ~/.npm
+            ~/.bun
             node_modules
             ~/.cache/ms-playwright
           key: ${{ env.CACHE_KEY }}
@@ -104,7 +104,7 @@ jobs:
           echo "Running burn-in: 10 iterations on changed specs"
           for i in {1..10}; do
             echo "Burn-in iteration $i/10"
-            npm run test -- $SPECS || {
+            bun run test -- $SPECS || {
               echo "❌ Burn-in failed on iteration $i"
               exit 1
             }
@@ -139,19 +139,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ${{ env.NODE_VERSION_FILE }}
-          cache: 'npm'
+          cache: 'bun'
 
       - name: Restore dependencies
         uses: actions/cache@v4
         with:
           path: |
-            ~/.npm
+            ~/.bun
             node_modules
             ~/.cache/ms-playwright
           key: ${{ env.CACHE_KEY }}
 
       - name: Run E2E tests (shard ${{ matrix.shard }})
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+        run: bun run test:e2e -- --shard=${{ matrix.shard }}/4
         env:
           TEST_ENV: staging
           CI: true
@@ -188,7 +188,7 @@ jobs:
 
       - name: Merge HTML reports
         run: |
-          npx playwright merge-reports --reporter=html all-results/
+          bunx playwright merge-reports --reporter=html all-results/
           echo "Merged report available in playwright-report/"
 
       - name: Upload merged report
@@ -265,7 +265,7 @@ for i in $(seq 1 $ITERATIONS); do
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   # Run tests with explicit file list
-  if npm run test -- $CHANGED_SPECS 2>&1 | tee "burn-in-log-$i.txt"; then
+  if bun run test -- $CHANGED_SPECS 2>&1 | tee "burn-in-log-$i.txt"; then
     echo "✅ Iteration $i passed"
   else
     echo "❌ Iteration $i failed"
@@ -367,7 +367,7 @@ function runShard(shardIndex) {
     const shardId = `${shardIndex}/${SHARD_COUNT}`;
     console.log(`\n📦 Starting shard ${shardId}...`);
 
-    const child = spawn('npx', ['playwright', 'test', `--shard=${shardId}`, '--reporter=json'], {
+    const child = spawn('bunx', ['playwright', 'test', `--shard=${shardId}`, '--reporter=json'], {
       env: { ...process.env, TEST_ENV, SHARD_INDEX: shardIndex },
       stdio: 'pipe',
     });
@@ -571,13 +571,13 @@ if echo "$CHANGED_FILES" | grep -qE '(package\.json|package-lock\.json|playwrigh
 # Auth/security changes = run all auth + smoke tests
 elif echo "$CHANGED_FILES" | grep -qE '(auth|login|signup|security)'; then
   echo "🔒 Auth/security files changed. Running auth + smoke tests."
-  npm run test -- --grep "@auth|@smoke"
+  bun run test -- --grep "@auth|@smoke"
   exit $?
 
 # API changes = run integration + smoke tests
 elif echo "$CHANGED_FILES" | grep -qE '(api|service|controller)'; then
   echo "🔌 API files changed. Running integration + smoke tests."
-  npm run test -- --grep "@integration|@smoke"
+  bun run test -- --grep "@integration|@smoke"
   exit $?
 
 # UI component changes = run related component tests
@@ -593,10 +593,10 @@ elif echo "$CHANGED_FILES" | grep -qE '\.(tsx|jsx|vue)$'; then
 
   if [ -n "$affected_specs" ]; then
     echo "Running tests for: $affected_specs"
-    npm run test -- $affected_specs --grep "@smoke"
+    bun run test -- $affected_specs --grep "@smoke"
   else
     echo "No specific tests found. Running smoke tests only."
-    npm run test -- --grep "@smoke"
+    bun run test -- --grep "@smoke"
   fi
   exit $?
 
@@ -613,11 +613,11 @@ fi
 if [ "$run_all_tests" = true ]; then
   echo ""
   echo "Running full test suite..."
-  npm run test
+  bun run test
 elif [ "$run_smoke_only" = true ]; then
   echo ""
   echo "Running smoke tests..."
-  npm run test -- --grep "@smoke"
+  bun run test -- --grep "@smoke"
 fi
 ```
 
@@ -657,14 +657,14 @@ jobs:
 
 Before deploying your CI pipeline, verify:
 
-- [ ] **Caching strategy**: node_modules, npm cache, browser binaries cached
+- [ ] **Caching strategy**: node_modules, bun cache, browser binaries cached
 - [ ] **Timeout budgets**: Each job has reasonable timeout (10-30 min)
 - [ ] **Artifact retention**: 30 days for reports, 7 days for failure artifacts
 - [ ] **Parallelization**: Matrix strategy uses fail-fast: false
 - [ ] **Burn-in enabled**: Changed specs run 5-10x before merge
 - [ ] **wait-on app startup**: CI waits for app (wait-on: 'http://localhost:3000')
 - [ ] **Secrets documented**: README lists required secrets (API keys, tokens)
-- [ ] **Local parity**: CI scripts runnable locally (npm run test:ci)
+- [ ] **Local parity**: CI scripts runnable locally (bun run test:ci)
 
 ## Integration Points
 

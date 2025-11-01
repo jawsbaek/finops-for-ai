@@ -1,6 +1,6 @@
 # Agent Customization
 # Customize any section below - all are optional
-# After editing: npx bmad-method build <agent-name>
+# After editing: bunx bmad-method build <agent-name>
 
 # Override agent name
 agent:

@@ -231,7 +231,7 @@ Starter provides: Next.js, TypeScript, tRPC, Prisma, NextAuth, Tailwind
 ↓
 Workflow only asks about: Database choice, deployment target, additional services
 ↓
-First story becomes: "npx create t3-app@latest my-app --trpc --nextauth --prisma"
+First story becomes: "bunx create t3-app@latest my-app --trpc --nextauth --prisma"
 ```
 
 ## Usage

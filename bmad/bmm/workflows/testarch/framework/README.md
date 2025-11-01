@@ -222,8 +222,8 @@ After completion, provides structured summary:
 **Next Steps**:
 
 1. Copy .env.example to .env and fill in environment variables
-2. Run npm install to install test dependencies
-3. Run npm run test:e2e to execute sample tests
+2. Run bun install to install test dependencies
+3. Run bun run test:e2e to execute sample tests
 4. Review tests/README.md for detailed setup instructions
 
 **Knowledge Base References Applied**:
@@ -241,7 +241,7 @@ After workflow completion, verify:
 - [ ] Configuration file created and syntactically valid
 - [ ] Directory structure exists with all folders
 - [ ] Environment configuration generated (.env.example, .nvmrc)
-- [ ] Sample tests run successfully (npm run test:e2e)
+- [ ] Sample tests run successfully (bun run test:e2e)
 - [ ] Documentation complete and accurate (tests/README.md)
 - [ ] No errors or warnings during scaffold
 - [ ] package.json scripts updated correctly
@@ -319,7 +319,7 @@ bmad tea *framework
 **Issue: "Sample test fails to run"**
 
 - **Cause**: Missing dependencies or incorrect BASE_URL
-- **Solution**: Run `npm install` and configure `.env` with correct URLs
+- **Solution**: Run `bun install` and configure `.env` with correct URLs
 
 **Issue: "TypeScript compilation errors"**
 

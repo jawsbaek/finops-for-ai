@@ -65,7 +65,7 @@ The TEA agent runs this workflow when:
    - Inline comments in CI configuration files
 
 5. **Optimization Features**
-   - Dependency caching (npm + browser binaries): 2-5 min savings
+   - Dependency caching (bun + browser binaries): 2-5 min savings
    - Parallel sharding: 75% time reduction
    - Retry logic: Handles transient failures (2 retries)
    - Failure-only artifacts: Cost-effective debugging
@@ -97,7 +97,7 @@ burn-in:
     - run: |
         for i in {1..10}; do
           echo "🔥 Burn-in iteration $i/10"
-          npm run test:e2e || exit 1
+          bun run test:e2e || exit 1
         done
 ```
 
@@ -120,7 +120,7 @@ strategy:
   matrix:
     shard: [1, 2, 3, 4]
 steps:
-  - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+  - run: bun run test:e2e -- --shard=${{ matrix.shard }}/4
 ```
 
 **Benefits:**
@@ -136,7 +136,7 @@ steps:
 ```yaml
 - uses: actions/cache@v4
   with:
-    path: ~/.npm
+    path: ~/.bun
     key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
 ```
 
@@ -153,7 +153,7 @@ steps:
 ```bash
 # scripts/test-changed.sh
 CHANGED_FILES=$(git diff --name-only HEAD~1)
-npm run test:e2e -- --grep="$AFFECTED_TESTS"
+bun run test:e2e -- --grep="$AFFECTED_TESTS"
 ```
 
 **Benefits:**

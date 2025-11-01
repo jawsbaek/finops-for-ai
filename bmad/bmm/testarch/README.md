@@ -222,8 +222,8 @@ This complexity **requires specialized documentation** (this guide), **extensive
 
 **Two Playwright MCP servers** (actively maintained, continuously updated):
 
-- `playwright` - Browser automation (`npx @playwright/mcp@latest`)
-- `playwright-test` - Test runner with failure analysis (`npx playwright run-test-mcp-server`)
+- `playwright` - Browser automation (`bunx @playwright/mcp@latest`)
+- `playwright-test` - Test runner with failure analysis (`bunx playwright run-test-mcp-server`)
 
 **How MCP Enhances TEA Workflows**:
 
@@ -253,11 +253,11 @@ MCP provides additional capabilities on top of TEA's default AI-based approach:
 {
   "mcpServers": {
     "playwright": {
-      "command": "npx",
+      "command": "bunx",
       "args": ["@playwright/mcp@latest"]
     },
     "playwright-test": {
-      "command": "npx",
+      "command": "bunx",
       "args": ["playwright", "run-test-mcp-server"]
     }
   }

@@ -33,7 +33,7 @@ FinOps for AI 프로젝트는 Phase 4 (Implementation)로 진입할 준비가 �
 
 **권장 다음 단계:**
 1. 즉시: 문서 수정 (20분)
-2. 1-2일 내: Story 1.1 구현 시작 (`npm create t3-app`)
+2. 1-2일 내: Story 1.1 구현 시작 (`bun create t3-app`)
 3. 1주 내: Epic 1 본격 진행
 
 ---
@@ -264,7 +264,7 @@ Phase 4 (Implementation) 진입 전 모든 계획 및 설계 문서가 일관성
 **Greenfield 체크리스트 검증:**
 
 ✅ **프로젝트 초기화:**
-- Story 1.1에서 T3 Stack 초기화 (`npm create t3-app`) 명시
+- Story 1.1에서 T3 Stack 초기화 (`bun create t3-app`) 명시
 - 데이터베이스 스키마 완전 정의 (14개 모델)
 
 ✅ **개발 환경 설정:**
@@ -521,7 +521,7 @@ _Minor items for consideration_
 **3. 구현 시작: Story 1.1 실행**
 ```bash
 # T3 Stack 초기화
-npm create t3-app@latest finops-for-ai -- --nextAuth --prisma --trpc --tailwind --typescript
+bun create t3-app@latest finops-for-ai -- --nextAuth --prisma --trpc --tailwind --typescript
 ```
 
 **4. 환경 설정**

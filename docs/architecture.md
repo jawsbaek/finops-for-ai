@@ -24,7 +24,7 @@ finops-for-ai 프로젝트는 **T3 Stack (Next.js 16 + tRPC + Prisma + NextAuth)
 **첫 번째 구현 스토리 (Story 1.1)에서 실행:**
 
 ```bash
-npm create t3-app@latest finops-for-ai -- --nextAuth --prisma --trpc --tailwind --typescript
+bun create t3-app@latest finops-for-ai -- --nextAuth --prisma --trpc --tailwind --typescript
 ```
 
 이 명령은 다음 아키텍처 결정을 자동으로 설정합니다:
@@ -730,7 +730,7 @@ public/
 #### Prisma Migrations
 ```bash
 # 마이그레이션 생성
-npx prisma migrate dev --name add_cloud_credentials_table
+bunx prisma migrate dev --name add_cloud_credentials_table
 
 # 명명: snake_case 동사
 # ✅ add_cloud_credentials_table
@@ -1360,7 +1360,7 @@ git push origin main
 ### Prerequisites
 
 - **Node.js**: 18.x or 20.x
-- **Package Manager**: npm, yarn, or pnpm
+- **Package Manager**: bun
 - **Database**: Neon PostgreSQL (또는 로컬 PostgreSQL)
 - **AWS Account**: KMS CMK 생성 필요
 - **Vercel Account**: Pro plan (Cron Jobs)
@@ -1369,7 +1369,7 @@ git push origin main
 
 ```bash
 # 1. 프로젝트 초기화
-npm create t3-app@latest finops-for-ai -- --nextAuth --prisma --trpc --tailwind --typescript
+bun create t3-app@latest finops-for-ai -- --nextAuth --prisma --trpc --tailwind --typescript
 
 cd finops-for-ai
 
@@ -1378,27 +1378,27 @@ cp .env.example .env
 # .env 파일 편집 (DATABASE_URL, AWS credentials 등)
 
 # 3. 의존성 설치
-npm install
+bun install
 
 # 추가 패키지 설치
-npm install @aws-sdk/client-kms @aws-sdk/client-cost-explorer
-npm install resend react-email
-npm install recharts
-npm install @tanstack/react-table
-npm install date-fns
-npm install pino pino-pretty
-npm install -D playwright vitest
+bun add @aws-sdk/client-kms @aws-sdk/client-cost-explorer
+bun add resend react-email
+bun add recharts
+bun add @tanstack/react-table
+bun add date-fns
+bun add pino pino-pretty
+bun add -D playwright vitest
 
 # 4. Prisma 설정
-npx prisma generate
-npx prisma migrate dev --name init
+bunx prisma generate
+bunx prisma migrate dev --name init
 
 # 5. 개발 서버 실행
-npm run dev
+bun run dev
 # http://localhost:3000
 
 # 6. Prisma Studio (DB GUI)
-npx prisma studio
+bunx prisma studio
 # http://localhost:5555
 ```
 
@@ -1406,22 +1406,22 @@ npx prisma studio
 
 ```bash
 # 데이터베이스 스키마 변경
-npx prisma migrate dev --name add_new_table
+bunx prisma migrate dev --name add_new_table
 
 # 타입 재생성
-npx prisma generate
+bunx prisma generate
 
 # 테스트 실행
-npm run test              # Vitest unit tests
-npm run test:e2e          # Playwright E2E tests
+bun run test              # Vitest unit tests
+bun run test:e2e          # Playwright E2E tests
 
 # 린팅 및 포맷팅
-npm run lint
-npm run format
+bun run lint
+bun run format
 
 # 프로덕션 빌드 테스트
-npm run build
-npm run start
+bun run build
+bun run start
 ```
 
 ---

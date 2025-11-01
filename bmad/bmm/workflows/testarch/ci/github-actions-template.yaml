@@ -31,13 +31,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
+          cache: "bun"
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install
 
       - name: Run linter
-        run: npm run lint
+        run: bun run lint
 
   # Test stage - Parallel execution with sharding
   test:
@@ -58,7 +58,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
+          cache: "bun"
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -69,13 +69,13 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium
 
       - name: Run tests (shard ${{ matrix.shard }}/4)
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+        run: bun run test:e2e -- --shard=${{ matrix.shard }}/4
 
       - name: Upload test results
         if: failure()
@@ -103,7 +103,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
+          cache: "bun"
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -112,10 +112,10 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
 
       - name: Install dependencies
-        run: npm ci
+        run: bun ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium
 
       - name: Run burn-in loop (10 iterations)
         run: |
@@ -124,7 +124,7 @@ jobs:
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "🔥 Burn-in iteration $i/10"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            npm run test:e2e || exit 1
+            bun run test:e2e || exit 1
           done
           echo "✅ Burn-in complete - no flaky tests detected"
 

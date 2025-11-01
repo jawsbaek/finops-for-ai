@@ -26,10 +26,10 @@ alwaysApply: false
   <flow>
     <step n="1" title="Verify Tool Installation">
       <action>Check if @kayvan/markdown-tree-parser is installed globally</action>
-      <action>Run: npm list -g @kayvan/markdown-tree-parser</action>
+      <action>Run: bun list -g @kayvan/markdown-tree-parser</action>
       <action if="not installed">Inform user that tool needs to be installed</action>
-      <action if="not installed">Run: npm install -g @kayvan/markdown-tree-parser</action>
-      <action if="installation fails">HALT with error message about npm/node requirements</action>
+      <action if="not installed">Run: bun install -g @kayvan/markdown-tree-parser</action>
+      <action if="installation fails">HALT with error message about bun/node requirements</action>
     </step>
 
     <step n="2" title="Get Source Document">
@@ -77,7 +77,7 @@ alwaysApply: false
 
   <halt-conditions critical="true">
     <i>HALT if @kayvan/markdown-tree-parser cannot be installed</i>
-    <i>HALT if Node.js or npm is not available</i>
+    <i>HALT if Node.js or bun is not available</i>
     <i>HALT if source document does not exist or is inaccessible</i>
     <i>HALT if source document is not markdown format (.md)</i>
     <i>HALT if destination folder cannot be created</i>
@@ -89,11 +89,11 @@ alwaysApply: false
   <tool-info>
     <name>@kayvan/markdown-tree-parser</name>
     <command>md-tree explode [source-document] [destination-folder]</command>
-    <installation>npm install -g @kayvan/markdown-tree-parser</installation>
+    <installation>bun install -g @kayvan/markdown-tree-parser</installation>
     <requirements>
       <i>Node.js installed</i>
-      <i>npm package manager</i>
-      <i>Global npm installation permissions</i>
+      <i>bun package manager</i>
+      <i>Global bun installation permissions</i>
     </requirements>
     <features>
       <i>Automatic section splitting by level 2 headings</i>

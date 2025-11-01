@@ -487,7 +487,7 @@ Generates failing acceptance tests BEFORE implementation following TDD's red-gre
    - [ ] Integrate authentication API
    - [ ] Add `data-testid` attributes: `email-input`, `password-input`, `login-button`
    - [ ] Implement error handling
-   - [ ] Run test: `npm run test:e2e -- login.spec.ts`
+   - [ ] Run test: `bun run test:e2e -- login.spec.ts`
    - [ ] ✅ Test passes (green phase)
 
    #### Test: Display Error for Invalid Credentials
@@ -495,7 +495,7 @@ Generates failing acceptance tests BEFORE implementation following TDD's red-gre
    - [ ] Add error state management
    - [ ] Display error message UI
    - [ ] Add `data-testid="error-message"`
-   - [ ] Run test: `npm run test:e2e -- login.spec.ts`
+   - [ ] Run test: `bun run test:e2e -- login.spec.ts`
    - [ ] ✅ Test passes (green phase)
    ```
 
@@ -534,16 +534,16 @@ Generates failing acceptance tests BEFORE implementation following TDD's red-gre
 
    ```bash
    # Run all failing tests
-   npm run test:e2e
+   bun run test:e2e
 
    # Run specific test file
-   npm run test:e2e -- login.spec.ts
+   bun run test:e2e -- login.spec.ts
 
    # Run tests in headed mode (see browser)
-   npm run test:e2e -- --headed
+   bun run test:e2e -- --headed
 
    # Debug specific test
-   npm run test:e2e -- login.spec.ts --debug
+   bun run test:e2e -- login.spec.ts --debug
    ```
    ````
 
@@ -745,7 +745,7 @@ After completing this workflow, provide a summary:
 
 **Next Steps for DEV Team**:
 
-1. Run failing tests: `npm run test:e2e`
+1. Run failing tests: `bun run test:e2e`
 2. Review implementation checklist
 3. Implement one test at a time (RED → GREEN)
 4. Refactor with confidence (tests provide safety net)

@@ -494,8 +494,8 @@ This is particularly powerful for brownfield projects where:
 **Priority tagging enables selective execution:**
 
 ```bash
-npm run test:e2e:p0  # Run only P0 tests (critical paths)
-npm run test:e2e:p1  # Run P0 + P1 tests (pre-merge)
+bun run test:e2e:p0  # Run only P0 tests (critical paths)
+bun run test:e2e:p1  # Run P0 + P1 tests (pre-merge)
 ```
 
 ### Given-When-Then Test Structure
@@ -811,9 +811,9 @@ See `tea-index.csv` for complete knowledge fragment mapping (22 fragments total)
 ## Test Execution
 
 ```bash
-npm run test:e2e       # Run all tests
-npm run test:e2e:p0    # Critical paths only
-npm run test:e2e:p1    # P0 + P1 tests
+bun run test:e2e       # Run all tests
+bun run test:e2e:p0    # Critical paths only
+bun run test:e2e:p1    # P0 + P1 tests
 ```
 ````
 
