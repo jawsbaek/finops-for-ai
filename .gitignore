@@ -44,3 +44,7 @@ yarn-error.log*
 
 # idea files
 .idea
+
+# IDE local settings
+.claude/settings.local.json
+.cursor/settings.local.json
