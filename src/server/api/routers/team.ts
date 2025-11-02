@@ -637,4 +637,250 @@ export const teamRouter = createTRPCRouter({
 				success: true,
 			};
 		}),
+
+	/**
+	 * Add a member to the team by email
+	 *
+	 * Only team owners and admins can add members
+	 */
+	addMember: protectedProcedure
+		.input(
+			z.object({
+				teamId: z.string(),
+				email: z.string().email(),
+				role: z.enum(["member", "admin"]).default("member"),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const userId = ctx.session.user.id;
+
+			// Verify requester is owner or admin
+			const requesterMembership = await db.teamMember.findUnique({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId,
+					},
+				},
+			});
+
+			if (
+				!requesterMembership ||
+				(requesterMembership.role !== "owner" &&
+					requesterMembership.role !== "admin")
+			) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Only team owners and admins can add members",
+				});
+			}
+
+			// Find user by email
+			const invitedUser = await db.user.findUnique({
+				where: { email: input.email },
+			});
+
+			if (!invitedUser) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: `사용자를 찾을 수 없습니다: ${input.email}`,
+				});
+			}
+
+			// Check if already a member
+			const existingMembership = await db.teamMember.findUnique({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId: invitedUser.id,
+					},
+				},
+			});
+
+			if (existingMembership) {
+				throw new TRPCError({
+					code: "CONFLICT",
+					message: "이미 팀 멤버입니다",
+				});
+			}
+
+			// Add member
+			const membership = await db.teamMember.create({
+				data: {
+					teamId: input.teamId,
+					userId: invitedUser.id,
+					role: input.role,
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							email: true,
+							name: true,
+						},
+					},
+				},
+			});
+
+			logger.info(
+				{
+					teamId: input.teamId,
+					invitedUserId: invitedUser.id,
+					invitedEmail: input.email,
+					role: input.role,
+					invitedBy: userId,
+				},
+				"Team member added successfully",
+			);
+
+			return membership;
+		}),
+
+	/**
+	 * Remove a member from the team
+	 *
+	 * Only team owners can remove members
+	 */
+	removeMember: protectedProcedure
+		.input(
+			z.object({
+				teamId: z.string(),
+				userId: z.string(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const requesterId = ctx.session.user.id;
+
+			// Verify requester is owner
+			const requesterMembership = await db.teamMember.findUnique({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId: requesterId,
+					},
+				},
+			});
+
+			if (!requesterMembership || requesterMembership.role !== "owner") {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Only team owners can remove members",
+				});
+			}
+
+			// Cannot remove team owner
+			if (input.userId === requesterId) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "팀 소유자는 팀에서 나갈 수 없습니다",
+				});
+			}
+
+			// Remove member
+			await db.teamMember.delete({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId: input.userId,
+					},
+				},
+			});
+
+			logger.info(
+				{
+					teamId: input.teamId,
+					removedUserId: input.userId,
+					removedBy: requesterId,
+				},
+				"Team member removed successfully",
+			);
+
+			return {
+				success: true,
+			};
+		}),
+
+	/**
+	 * Update member role
+	 *
+	 * Only team owners can change roles
+	 */
+	updateMemberRole: protectedProcedure
+		.input(
+			z.object({
+				teamId: z.string(),
+				userId: z.string(),
+				role: z.enum(["member", "admin", "owner"]),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const requesterId = ctx.session.user.id;
+
+			// Verify requester is owner
+			const requesterMembership = await db.teamMember.findUnique({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId: requesterId,
+					},
+				},
+			});
+
+			if (!requesterMembership || requesterMembership.role !== "owner") {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Only team owners can change member roles",
+				});
+			}
+
+			// Cannot change own role
+			if (input.userId === requesterId) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "자신의 역할은 변경할 수 없습니다",
+				});
+			}
+
+			// Update role
+			const membership = await db.teamMember.update({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId: input.userId,
+					},
+				},
+				data: {
+					role: input.role,
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							email: true,
+							name: true,
+						},
+					},
+				},
+			});
+
+			// If promoting to owner, update team.ownerId
+			if (input.role === "owner") {
+				await db.team.update({
+					where: { id: input.teamId },
+					data: { ownerId: input.userId },
+				});
+			}
+
+			logger.info(
+				{
+					teamId: input.teamId,
+					userId: input.userId,
+					newRole: input.role,
+					changedBy: requesterId,
+				},
+				"Team member role updated successfully",
+			);
+
+			return membership;
+		}),
 });
