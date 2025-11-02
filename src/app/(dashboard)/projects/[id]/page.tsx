@@ -66,7 +66,7 @@ export default function ProjectDetailPage() {
 	});
 
 	// Disable API key mutation
-	const disableApiKey = api.cost.disableApiKey.useMutation({
+	const disableApiKey = api.team.disableApiKey.useMutation({
 		onSuccess: () => {
 			toast.success("API 키가 비활성화되었습니다", {
 				description: "이 키를 사용하는 모든 요청이 차단됩니다",

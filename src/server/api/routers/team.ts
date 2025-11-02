@@ -296,19 +296,28 @@ export const teamRouter = createTRPCRouter({
 				});
 
 				// If ownership is being transferred, update team member roles
-				if (isOwnershipTransfer && input.ownerId && currentTeam.ownerId) {
-					// Demote current owner to admin
-					await tx.teamMember.update({
+				if (isOwnershipTransfer && input.ownerId) {
+					// Demote all current owners to admin (handles both explicit ownerId and legacy teams)
+					const currentOwners = await tx.teamMember.findMany({
 						where: {
-							teamId_userId: {
-								teamId: input.teamId,
-								userId: currentTeam.ownerId,
-							},
-						},
-						data: {
-							role: "admin",
+							teamId: input.teamId,
+							role: "owner",
 						},
 					});
+
+					for (const owner of currentOwners) {
+						await tx.teamMember.update({
+							where: {
+								teamId_userId: {
+									teamId: input.teamId,
+									userId: owner.userId,
+								},
+							},
+							data: {
+								role: "admin",
+							},
+						});
+					}
 
 					// Check if new owner is already a member
 					const newOwnerMembership = await tx.teamMember.findUnique({
@@ -350,6 +359,7 @@ export const teamRouter = createTRPCRouter({
 							previousOwnerId: currentTeam.ownerId,
 							newOwnerId: input.ownerId,
 							userId,
+							demotedOwnerCount: currentOwners.length,
 						},
 						"Team ownership transferred successfully",
 					);
@@ -467,7 +477,7 @@ export const teamRouter = createTRPCRouter({
 			return {
 				id: apiKey.id,
 				provider: apiKey.provider,
-				maskedKey: `****${encrypted.ciphertext.slice(-4)}`,
+				maskedKey: "sk-••••••••••••••••••••",
 				createdAt: apiKey.createdAt,
 			};
 		}),
@@ -538,51 +548,51 @@ export const teamRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const userId = ctx.session.user.id;
 
-			// Verify API key exists and get team info
-			const apiKey = await db.apiKey.findUnique({
-				where: { id: input.apiKeyId },
-				include: {
-					team: {
-						select: {
-							id: true,
-							name: true,
+			// Perform all operations in transaction to prevent TOCTOU race conditions
+			const result = await db.$transaction(async (tx) => {
+				// 1. Verify API key exists and get team info (inside transaction)
+				const apiKey = await tx.apiKey.findUnique({
+					where: { id: input.apiKeyId },
+					include: {
+						team: {
+							select: {
+								id: true,
+								name: true,
+							},
 						},
 					},
-				},
-			});
-
-			if (!apiKey) {
-				throw new TRPCError({
-					code: "NOT_FOUND",
-					message: "API key not found",
 				});
-			}
 
-			// Verify user is an owner of this team
-			const membership = await db.teamMember.findUnique({
-				where: {
-					teamId_userId: {
-						teamId: apiKey.teamId,
-						userId,
+				if (!apiKey) {
+					throw new TRPCError({
+						code: "NOT_FOUND",
+						message: "API key not found",
+					});
+				}
+
+				// 2. Verify user is an owner of this team (inside transaction)
+				const membership = await tx.teamMember.findUnique({
+					where: {
+						teamId_userId: {
+							teamId: apiKey.teamId,
+							userId,
+						},
 					},
-				},
-			});
-
-			if (!membership || membership.role !== "owner") {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "Only team owners can disable API keys",
 				});
-			}
 
-			// Store previous state for audit
-			const previousState = {
-				isActive: apiKey.isActive,
-			};
+				if (!membership || membership.role !== "owner") {
+					throw new TRPCError({
+						code: "FORBIDDEN",
+						message: "Only team owners can disable API keys",
+					});
+				}
 
-			// Disable API key and create audit log in transaction
-			await db.$transaction(async (tx) => {
-				// Disable the API key
+				// Store previous state for audit
+				const previousState = {
+					isActive: apiKey.isActive,
+				};
+
+				// 3. Disable the API key
 				await tx.apiKey.update({
 					where: { id: input.apiKeyId },
 					data: {
@@ -590,7 +600,7 @@ export const teamRouter = createTRPCRouter({
 					},
 				});
 
-				// Create audit log
+				// 4. Create audit log
 				await tx.auditLog.create({
 					data: {
 						userId,
@@ -604,12 +614,14 @@ export const teamRouter = createTRPCRouter({
 						},
 					},
 				});
+
+				return { apiKey, previousState };
 			});
 
 			logger.info(
 				{
 					apiKeyId: input.apiKeyId,
-					teamId: apiKey.teamId,
+					teamId: result.apiKey.teamId,
 					userId,
 					reason: input.reason,
 				},
