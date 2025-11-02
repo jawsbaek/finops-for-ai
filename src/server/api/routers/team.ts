@@ -297,7 +297,7 @@ export const teamRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const userId = ctx.session.user.id;
 
-			// Verify user is a member of this team
+			// Verify user is an owner of this team
 			const membership = await db.teamMember.findUnique({
 				where: {
 					teamId_userId: {
@@ -307,10 +307,10 @@ export const teamRouter = createTRPCRouter({
 				},
 			});
 
-			if (!membership) {
+			if (!membership || membership.role !== "owner") {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this team",
+					message: "Only team owners can generate API keys",
 				});
 			}
 
@@ -459,7 +459,7 @@ export const teamRouter = createTRPCRouter({
 				});
 			}
 
-			// Verify user has access to this team
+			// Verify user is an owner of this team
 			const membership = await db.teamMember.findUnique({
 				where: {
 					teamId_userId: {
@@ -469,10 +469,10 @@ export const teamRouter = createTRPCRouter({
 				},
 			});
 
-			if (!membership) {
+			if (!membership || membership.role !== "owner") {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this API key",
+					message: "Only team owners can disable API keys",
 				});
 			}
 
