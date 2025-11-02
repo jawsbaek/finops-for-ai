@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { useMemo } from "react";
 import {
 	Area,
 	AreaChart,
@@ -82,20 +83,24 @@ export function CostChart({
 	onDataPointClick,
 	className,
 }: CostChartProps) {
-	const formattedData = data.map((point) => ({
-		...point,
-		timestamp:
-			typeof point.timestamp === "string"
-				? new Date(point.timestamp)
-				: point.timestamp,
-		name: format(
-			typeof point.timestamp === "string"
-				? new Date(point.timestamp)
-				: point.timestamp,
-			"MMM d",
-			{ locale: ko },
-		),
-	}));
+	// Memoize formatted data to avoid unnecessary recalculations
+	const formattedData = useMemo(
+		() =>
+			data.map((point) => {
+				// Convert timestamp once to avoid duplicate work
+				const timestamp =
+					typeof point.timestamp === "string"
+						? new Date(point.timestamp)
+						: point.timestamp;
+
+				return {
+					...point,
+					timestamp,
+					name: format(timestamp, "MMM d", { locale: ko }),
+				};
+			}),
+		[data],
+	);
 
 	const chartProps = {
 		data: formattedData,

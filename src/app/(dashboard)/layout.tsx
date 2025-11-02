@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "~/server/auth";
 
@@ -46,19 +47,19 @@ export default async function DashboardLayout({
 				<div className="flex gap-6">
 					{/* Sidebar */}
 					<aside className="w-64 rounded-lg border border-border bg-card p-6 shadow-sm">
-						<nav className="space-y-2">
-							<a
+						<nav className="space-y-2" aria-label="주요 네비게이션">
+							<Link
 								href="/dashboard"
 								className="block rounded-md bg-primary/10 px-3 py-2 font-medium text-primary text-sm"
 							>
 								대시보드
-							</a>
-							<a
+							</Link>
+							<Link
 								href="/projects"
 								className="block rounded-md px-3 py-2 font-medium text-muted-foreground text-sm hover:bg-muted hover:text-foreground"
 							>
 								프로젝트
-							</a>
+							</Link>
 						</nav>
 					</aside>
 

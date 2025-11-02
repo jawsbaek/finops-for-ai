@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { type VariantProps, cva } from "class-variance-authority";
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, memo } from "react";
 
 const statCardVariants = cva(
 	"relative overflow-hidden transition-all duration-200",
@@ -59,7 +59,7 @@ export interface StatCardProps
 	onClick?: () => void;
 }
 
-export function StatCard({
+const StatCardComponent = ({
 	label,
 	value,
 	change,
@@ -71,7 +71,7 @@ export function StatCard({
 	onClick,
 	className,
 	...props
-}: StatCardProps) {
+}: StatCardProps) => {
 	const clickable = !!onClick;
 
 	const trendIcon = {
@@ -133,4 +133,7 @@ export function StatCard({
 			</div>
 		</Card>
 	);
-}
+};
+
+// Memoize to prevent unnecessary re-renders
+export const StatCard = memo(StatCardComponent);
