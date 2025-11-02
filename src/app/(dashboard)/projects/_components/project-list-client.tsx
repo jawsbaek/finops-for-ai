@@ -58,7 +58,10 @@ export function ProjectListClient({
 	});
 
 	// Get user's teams for project creation
-	const firstTeamId = currentUser?.teamMemberships?.[0]?.teamId ?? "";
+	const firstTeamId =
+		currentUser?.teamMemberships && currentUser.teamMemberships.length > 0
+			? currentUser.teamMemberships[0]?.teamId
+			: undefined;
 
 	const handleCreateProject = () => {
 		if (!name.trim()) {
@@ -67,7 +70,9 @@ export function ProjectListClient({
 		}
 
 		if (!firstTeamId) {
-			toast.error("팀 정보를 찾을 수 없습니다");
+			toast.error("팀 정보를 찾을 수 없습니다", {
+				description: "팀이 할당되지 않은 계정입니다. 관리자에게 문의하세요.",
+			});
 			return;
 		}
 
