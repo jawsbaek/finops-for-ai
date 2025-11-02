@@ -235,56 +235,55 @@ export const teamRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const userId = ctx.session.user.id;
 
-			// Verify user is an owner of this team
-			const membership = await db.teamMember.findUnique({
-				where: {
-					teamId_userId: {
-						teamId: input.teamId,
-						userId,
+			// Perform all operations in transaction to prevent TOCTOU race conditions
+			const team = await db.$transaction(async (tx) => {
+				// 1. Verify user is an owner of this team (inside transaction)
+				const membership = await tx.teamMember.findUnique({
+					where: {
+						teamId_userId: {
+							teamId: input.teamId,
+							userId,
+						},
 					},
-				},
-			});
-
-			if (!membership || membership.role !== "owner") {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "Only team owners can update team information",
-				});
-			}
-
-			// Check if ownership is being transferred
-			const currentTeam = await db.team.findUnique({
-				where: { id: input.teamId },
-				select: { ownerId: true },
-			});
-
-			if (!currentTeam) {
-				throw new TRPCError({
-					code: "NOT_FOUND",
-					message: "Team not found",
-				});
-			}
-
-			const isOwnershipTransfer =
-				input.ownerId && input.ownerId !== currentTeam.ownerId;
-
-			// Validate new owner exists if transferring ownership
-			if (isOwnershipTransfer && input.ownerId) {
-				const newOwner = await db.user.findUnique({
-					where: { id: input.ownerId },
-					select: { id: true },
 				});
 
-				if (!newOwner) {
+				if (!membership || membership.role !== "owner") {
 					throw new TRPCError({
-						code: "BAD_REQUEST",
-						message: "New owner user does not exist",
+						code: "FORBIDDEN",
+						message: "Only team owners can update team information",
 					});
 				}
-			}
 
-			// Update team with ownership transfer logic
-			const team = await db.$transaction(async (tx) => {
+				// 2. Check if ownership is being transferred
+				const currentTeam = await tx.team.findUnique({
+					where: { id: input.teamId },
+					select: { ownerId: true },
+				});
+
+				if (!currentTeam) {
+					throw new TRPCError({
+						code: "NOT_FOUND",
+						message: "Team not found",
+					});
+				}
+
+				const isOwnershipTransfer =
+					input.ownerId && input.ownerId !== currentTeam.ownerId;
+
+				// 3. Validate new owner exists if transferring ownership
+				if (isOwnershipTransfer && input.ownerId) {
+					const newOwner = await tx.user.findUnique({
+						where: { id: input.ownerId },
+						select: { id: true },
+					});
+
+					if (!newOwner) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "New owner user does not exist",
+						});
+					}
+				}
 				// Update team record
 				const updatedTeam = await tx.team.update({
 					where: { id: input.teamId },
@@ -403,24 +402,7 @@ export const teamRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const userId = ctx.session.user.id;
 
-			// Verify user is an owner of this team
-			const membership = await db.teamMember.findUnique({
-				where: {
-					teamId_userId: {
-						teamId: input.teamId,
-						userId,
-					},
-				},
-			});
-
-			if (!membership || membership.role !== "owner") {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "Only team owners can generate API keys",
-				});
-			}
-
-			// Validate API key format
+			// Validate API key format (fast fail before expensive operations)
 			const isValid = validateApiKey(input.apiKey, input.provider);
 			if (!isValid) {
 				throw new TRPCError({
@@ -432,9 +414,26 @@ export const teamRouter = createTRPCRouter({
 			// Encrypt the API key using KMS envelope encryption (before transaction)
 			const encrypted = await generateEncryptedApiKey(input.apiKey);
 
-			// Check for existing key and create new one in transaction to prevent race condition
+			// Perform all database operations in transaction to prevent TOCTOU race conditions
 			const apiKey = await db.$transaction(async (tx) => {
-				// Check if team already has an active API key for this provider
+				// 1. Verify user is an owner of this team (inside transaction)
+				const membership = await tx.teamMember.findUnique({
+					where: {
+						teamId_userId: {
+							teamId: input.teamId,
+							userId,
+						},
+					},
+				});
+
+				if (!membership || membership.role !== "owner") {
+					throw new TRPCError({
+						code: "FORBIDDEN",
+						message: "Only team owners can generate API keys",
+					});
+				}
+
+				// 2. Check if team already has an active API key for this provider
 				const existingKey = await tx.apiKey.findFirst({
 					where: {
 						teamId: input.teamId,
