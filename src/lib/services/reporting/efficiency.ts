@@ -172,15 +172,15 @@ export interface ProjectEfficiencySummary {
  * Novel Pattern 1: Used for weekly reports to rank Top 3 / Bottom 3 projects
  *
  * @param teamIds - Team IDs to filter projects
- * @param days - Number of days to look back (default: 30)
+ * @param startDate - Start date for the period
+ * @param endDate - End date for the period
  * @returns Array of project efficiency summaries sorted by efficiency (desc)
  */
 export async function getProjectEfficiencyRankings(
 	teamIds: string[],
-	days = 30,
+	startDate: Date,
+	endDate: Date,
 ): Promise<ProjectEfficiencySummary[]> {
-	const startDate = subDays(new Date(), days);
-
 	// Get all projects with costs and metrics
 	const projects = await db.project.findMany({
 		where: {
@@ -192,6 +192,7 @@ export async function getProjectEfficiencyRankings(
 				where: {
 					date: {
 						gte: startDate,
+						lte: endDate,
 					},
 				},
 				select: {
