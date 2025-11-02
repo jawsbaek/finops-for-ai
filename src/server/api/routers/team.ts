@@ -235,19 +235,21 @@ export const teamRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const userId = ctx.session.user.id;
 
-			// Perform all operations in transaction to prevent TOCTOU race conditions
+			// Perform all operations in transaction with row locking to prevent race conditions
 			const team = await db.$transaction(async (tx) => {
-				// 1. Verify user is an owner of this team (inside transaction)
-				const membership = await tx.teamMember.findUnique({
-					where: {
-						teamId_userId: {
-							teamId: input.teamId,
-							userId,
-						},
-					},
-				});
+				// 1. Lock and verify user is an owner (SELECT FOR UPDATE prevents concurrent role changes)
+				const membershipLock = await tx.$queryRaw<
+					Array<{ id: string; role: string }>
+				>`
+					SELECT id, role FROM team_members
+					WHERE team_id = ${input.teamId} AND user_id = ${userId}
+					FOR UPDATE
+				`;
 
-				if (!membership || membership.role !== "owner") {
+				if (
+					membershipLock.length === 0 ||
+					membershipLock[0]?.role !== "owner"
+				) {
 					throw new TRPCError({
 						code: "FORBIDDEN",
 						message: "Only team owners can update team information",
@@ -414,19 +416,21 @@ export const teamRouter = createTRPCRouter({
 			// Encrypt the API key using KMS envelope encryption (before transaction)
 			const encrypted = await generateEncryptedApiKey(input.apiKey);
 
-			// Perform all database operations in transaction to prevent TOCTOU race conditions
+			// Perform all database operations in transaction with row locking
 			const apiKey = await db.$transaction(async (tx) => {
-				// 1. Verify user is an owner of this team (inside transaction)
-				const membership = await tx.teamMember.findUnique({
-					where: {
-						teamId_userId: {
-							teamId: input.teamId,
-							userId,
-						},
-					},
-				});
+				// 1. Lock and verify user is an owner (SELECT FOR UPDATE prevents concurrent role changes)
+				const membershipLock = await tx.$queryRaw<
+					Array<{ id: string; role: string }>
+				>`
+					SELECT id, role FROM team_members
+					WHERE team_id = ${input.teamId} AND user_id = ${userId}
+					FOR UPDATE
+				`;
 
-				if (!membership || membership.role !== "owner") {
+				if (
+					membershipLock.length === 0 ||
+					membershipLock[0]?.role !== "owner"
+				) {
 					throw new TRPCError({
 						code: "FORBIDDEN",
 						message: "Only team owners can generate API keys",
