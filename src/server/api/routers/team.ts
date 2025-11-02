@@ -1,24 +1,19 @@
 /**
  * Team tRPC Router
  *
- * Provides API endpoints for team management and API key operations
+ * Provides API endpoints for team management
  * - create: Create a new team with owner as first member
  * - getAll: Get all teams where user is a member
- * - getById: Get team details including members and API keys
+ * - getById: Get team details including members and projects
  * - update: Update team information (name, budget, owner)
- * - generateApiKey: Create and encrypt a new API key for the team
- * - listApiKeys: List all API keys for a team
- * - disableApiKey: Disable an API key with audit logging
+ * - addMember: Add a member to the team
+ * - removeMember: Remove a member from the team
+ * - updateMemberRole: Update a member's role
  */
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { logger } from "~/lib/logger";
-import {
-	decryptApiKey,
-	generateEncryptedApiKey,
-	validateApiKey,
-} from "~/lib/services/encryption/api-key-manager";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { db } from "~/server/db";
 
@@ -119,7 +114,6 @@ export const teamRouter = createTRPCRouter({
 						_count: {
 							select: {
 								members: true,
-								apiKeys: true,
 							},
 						},
 					},
@@ -139,7 +133,6 @@ export const teamRouter = createTRPCRouter({
 			budget: membership.team.budget?.toNumber(),
 			role: membership.role,
 			memberCount: membership.team._count.members,
-			apiKeyCount: membership.team._count.apiKeys,
 			createdAt: membership.team.createdAt,
 			updatedAt: membership.team.updatedAt,
 		}));
@@ -195,17 +188,18 @@ export const teamRouter = createTRPCRouter({
 							createdAt: "asc",
 						},
 					},
-					apiKeys: {
-						where: {
-							isActive: true,
-						},
+					projects: {
 						select: {
 							id: true,
-							provider: true,
-							isActive: true,
+							name: true,
+							description: true,
 							createdAt: true,
-							updatedAt: true,
-							encryptedKey: true, // We'll mask this
+							_count: {
+								select: {
+									members: true,
+									apiKeys: true,
+								},
+							},
 						},
 						orderBy: {
 							createdAt: "desc",
@@ -235,14 +229,13 @@ export const teamRouter = createTRPCRouter({
 					user: m.user,
 					createdAt: m.createdAt,
 				})),
-				apiKeys: team.apiKeys.map((key) => ({
-					id: key.id,
-					provider: key.provider,
-					isActive: key.isActive,
-					// Mask the encrypted key - use generic placeholder to avoid exposing encryption patterns
-					maskedKey: "sk-••••••••••••••••••••",
-					createdAt: key.createdAt,
-					updatedAt: key.updatedAt,
+				projects: team.projects.map((p) => ({
+					id: p.id,
+					name: p.name,
+					description: p.description,
+					createdAt: p.createdAt,
+					memberCount: p._count.members,
+					apiKeyCount: p._count.apiKeys,
 				})),
 			};
 		}),
@@ -413,240 +406,6 @@ export const teamRouter = createTRPCRouter({
 				ownerId: team.ownerId,
 				budget: team.budget?.toNumber(),
 				updatedAt: team.updatedAt,
-			};
-		}),
-
-	/**
-	 * Generate and store an encrypted API key for the team
-	 *
-	 * Teams can have multiple API keys per provider
-	 * Uses KMS envelope encryption to securely store the API key
-	 */
-	generateApiKey: protectedProcedure
-		.input(
-			z.object({
-				teamId: z.string(),
-				provider: z.literal("openai"),
-				apiKey: z.string().min(1, "API key is required"),
-			}),
-		)
-		.mutation(async ({ ctx, input }) => {
-			const userId = ctx.session.user.id;
-
-			// Validate API key format (fast fail before expensive operations)
-			const isValid = validateApiKey(input.apiKey, input.provider);
-			if (!isValid) {
-				throw new TRPCError({
-					code: "BAD_REQUEST",
-					message: `Invalid ${input.provider} API key format`,
-				});
-			}
-
-			// Encrypt the API key using KMS envelope encryption (before transaction)
-			const encrypted = await generateEncryptedApiKey(input.apiKey);
-
-			// Perform all database operations in transaction with row locking
-			const apiKey = await db.$transaction(async (tx) => {
-				// 1. Lock and verify user is an owner (SELECT FOR UPDATE prevents concurrent role changes)
-				const membershipLock = await tx.$queryRaw<
-					Array<{ id: string; role: string }>
-				>`
-					SELECT id, role FROM team_members
-					WHERE team_id = ${input.teamId} AND user_id = ${userId}
-					FOR UPDATE
-				`;
-
-				if (
-					membershipLock.length === 0 ||
-					membershipLock[0]?.role !== "owner"
-				) {
-					throw new TRPCError({
-						code: "FORBIDDEN",
-						message: "Only team owners can generate API keys",
-					});
-				}
-
-				// Store encrypted key in database
-				return await tx.apiKey.create({
-					data: {
-						teamId: input.teamId,
-						provider: input.provider,
-						encryptedKey: encrypted.ciphertext,
-						encryptedDataKey: encrypted.encryptedDataKey,
-						iv: encrypted.iv,
-						isActive: true,
-					},
-				});
-			});
-
-			logger.info(
-				{
-					apiKeyId: apiKey.id,
-					teamId: input.teamId,
-					provider: input.provider,
-					userId,
-				},
-				"API key generated and encrypted successfully",
-			);
-
-			return {
-				id: apiKey.id,
-				provider: apiKey.provider,
-				maskedKey: "sk-••••••••••••••••••••",
-				createdAt: apiKey.createdAt,
-			};
-		}),
-
-	/**
-	 * List all API keys for a team
-	 *
-	 * Returns both active and inactive keys with masked values
-	 */
-	listApiKeys: protectedProcedure
-		.input(
-			z.object({
-				teamId: z.string(),
-			}),
-		)
-		.query(async ({ ctx, input }) => {
-			const userId = ctx.session.user.id;
-
-			// Verify user is a member of this team
-			const membership = await db.teamMember.findUnique({
-				where: {
-					teamId_userId: {
-						teamId: input.teamId,
-						userId,
-					},
-				},
-			});
-
-			if (!membership) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "You do not have access to this team",
-				});
-			}
-
-			const apiKeys = await db.apiKey.findMany({
-				where: {
-					teamId: input.teamId,
-				},
-				orderBy: {
-					createdAt: "desc",
-				},
-			});
-
-			return apiKeys.map((key) => ({
-				id: key.id,
-				provider: key.provider,
-				isActive: key.isActive,
-				maskedKey: "sk-••••••••••••••••••••",
-				createdAt: key.createdAt,
-				updatedAt: key.updatedAt,
-			}));
-		}),
-
-	/**
-	 * Disable an API key
-	 *
-	 * Immediately disables an API key to prevent further cost accumulation
-	 * Records action in audit log
-	 */
-	disableApiKey: protectedProcedure
-		.input(
-			z.object({
-				apiKeyId: z.string(),
-				reason: z.string().min(1, "Reason is required"),
-			}),
-		)
-		.mutation(async ({ ctx, input }) => {
-			const userId = ctx.session.user.id;
-
-			// Perform all operations in transaction to prevent TOCTOU race conditions
-			const result = await db.$transaction(async (tx) => {
-				// 1. Verify API key exists and get team info (inside transaction)
-				const apiKey = await tx.apiKey.findUnique({
-					where: { id: input.apiKeyId },
-					include: {
-						team: {
-							select: {
-								id: true,
-								name: true,
-							},
-						},
-					},
-				});
-
-				if (!apiKey) {
-					throw new TRPCError({
-						code: "NOT_FOUND",
-						message: "API key not found",
-					});
-				}
-
-				// 2. Lock and verify user is an owner (SELECT FOR UPDATE prevents concurrent role changes)
-				const membershipLock = await tx.$queryRaw<
-					Array<{ id: string; role: string }>
-				>`
-					SELECT id, role FROM team_members
-					WHERE team_id = ${apiKey.teamId} AND user_id = ${userId}
-					FOR UPDATE
-				`;
-
-				if (
-					membershipLock.length === 0 ||
-					membershipLock[0]?.role !== "owner"
-				) {
-					throw new TRPCError({
-						code: "FORBIDDEN",
-						message: "Only team owners can disable API keys",
-					});
-				}
-
-				// Store previous state for audit
-				const previousState = {
-					isActive: apiKey.isActive,
-				};
-
-				// 3. Disable the API key
-				await tx.apiKey.update({
-					where: { id: input.apiKeyId },
-					data: {
-						isActive: false,
-					},
-				});
-
-				// 4. Create audit log
-				await tx.auditLog.create({
-					data: {
-						userId,
-						actionType: "api_key_disabled",
-						resourceType: "api_key",
-						resourceId: input.apiKeyId,
-						metadata: {
-							reason: input.reason,
-							previousState,
-							teamId: apiKey.teamId,
-						},
-					},
-				});
-
-				return { apiKey, previousState };
-			});
-
-			logger.info(
-				{
-					apiKeyId: input.apiKeyId,
-					teamId: result.apiKey.teamId,
-					userId,
-					reason: input.reason,
-				},
-				"API key disabled successfully",
-			);
-
-			return {
-				success: true,
 			};
 		}),
 
