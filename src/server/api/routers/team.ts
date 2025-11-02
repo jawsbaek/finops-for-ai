@@ -573,17 +573,19 @@ export const teamRouter = createTRPCRouter({
 					});
 				}
 
-				// 2. Verify user is an owner of this team (inside transaction)
-				const membership = await tx.teamMember.findUnique({
-					where: {
-						teamId_userId: {
-							teamId: apiKey.teamId,
-							userId,
-						},
-					},
-				});
+				// 2. Lock and verify user is an owner (SELECT FOR UPDATE prevents concurrent role changes)
+				const membershipLock = await tx.$queryRaw<
+					Array<{ id: string; role: string }>
+				>`
+					SELECT id, role FROM team_members
+					WHERE team_id = ${apiKey.teamId} AND user_id = ${userId}
+					FOR UPDATE
+				`;
 
-				if (!membership || membership.role !== "owner") {
+				if (
+					membershipLock.length === 0 ||
+					membershipLock[0]?.role !== "owner"
+				) {
 					throw new TRPCError({
 						code: "FORBIDDEN",
 						message: "Only team owners can disable API keys",
