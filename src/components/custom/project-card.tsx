@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { type LucideIcon, TrendingDown, TrendingUp } from "lucide-react";
+import { memo } from "react";
 
 export interface ProjectAction {
 	icon: LucideIcon;
@@ -47,7 +48,7 @@ const statusConfig = {
 	},
 };
 
-export function ProjectCard({
+const ProjectCardComponent = ({
 	name,
 	team,
 	cost,
@@ -56,7 +57,7 @@ export function ProjectCard({
 	actions = [],
 	onClick,
 	className,
-}: ProjectCardProps) {
+}: ProjectCardProps) => {
 	const config = statusConfig[status];
 	const isIncreasing = trend?.change.startsWith("+");
 
@@ -135,4 +136,7 @@ export function ProjectCard({
 			</div>
 		</Card>
 	);
-}
+};
+
+// Memoize to prevent unnecessary re-renders
+export const ProjectCard = memo(ProjectCardComponent);
