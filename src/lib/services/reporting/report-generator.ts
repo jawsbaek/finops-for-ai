@@ -92,24 +92,14 @@ export async function generateWeeklyReport(): Promise<WeeklyReportData> {
 		};
 	}
 
-	// Get efficiency rankings for current week (last 7 days)
-	const projectSummaries = await getProjectEfficiencyRankings(teamIds, 7);
+	// Get efficiency rankings for the completed week (previous week)
+	const projectSummaries = await getProjectEfficiencyRankings(
+		teamIds,
+		weekStart,
+		weekEnd,
+	);
 
-	// Calculate total cost for current week
-	const currentWeekCosts = await db.costData.groupBy({
-		by: ["projectId"],
-		where: {
-			date: {
-				gte: weekStart,
-				lte: weekEnd,
-			},
-		},
-		_sum: {
-			cost: true,
-		},
-	});
-
-	// Calculate total cost for previous week
+	// Calculate total cost for previous week (week before that)
 	const previousWeekCosts = await db.costData.groupBy({
 		by: ["projectId"],
 		where: {
@@ -123,14 +113,7 @@ export async function generateWeeklyReport(): Promise<WeeklyReportData> {
 		},
 	});
 
-	// Build lookup maps for cost comparison
-	const currentWeekCostMap = new Map(
-		currentWeekCosts.map((c) => [
-			c.projectId || "unknown",
-			c._sum.cost?.toNumber() ?? 0,
-		]),
-	);
-
+	// Build lookup map for previous week costs (for week-over-week comparison)
 	const previousWeekCostMap = new Map(
 		previousWeekCosts.map((c) => [
 			c.projectId || "unknown",
@@ -141,7 +124,8 @@ export async function generateWeeklyReport(): Promise<WeeklyReportData> {
 	// Enhance project summaries with week-over-week change
 	const projectsWithChange: WeeklyProjectSummary[] = projectSummaries.map(
 		(project) => {
-			const currentCost = currentWeekCostMap.get(project.projectId) ?? 0;
+			// Use totalCost from project summary (already calculated in getProjectEfficiencyRankings)
+			const currentCost = project.totalCost;
 			const previousCost = previousWeekCostMap.get(project.projectId) ?? 0;
 			const weekChange = calculateWeekChange(currentCost, previousCost);
 
@@ -153,8 +137,8 @@ export async function generateWeeklyReport(): Promise<WeeklyReportData> {
 	);
 
 	// Calculate organization-wide totals
-	const totalCurrentWeekCost = Array.from(currentWeekCostMap.values()).reduce(
-		(sum, cost) => sum + cost,
+	const totalCurrentWeekCost = projectSummaries.reduce(
+		(sum, project) => sum + project.totalCost,
 		0,
 	);
 

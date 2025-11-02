@@ -81,7 +81,7 @@ export default function ReportsPage() {
 
 			{!isLoading && reports && reports.length > 0 && (
 				<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{reports.map((report) => {
+					{reports.map((report: (typeof reports)[number]) => {
 						// Parse report data
 						const data = report.data as {
 							totalCost: number;

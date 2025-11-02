@@ -71,17 +71,28 @@ export async function GET(request: Request) {
 				},
 			});
 		} catch (error) {
-			// Log entry already exists - another instance is running or completed
-			logger.info({
-				jobName,
-				date: today,
-				message:
-					"Weekly report already generated or in progress today, skipping",
-			});
-			return NextResponse.json({
-				success: true,
-				message: "Report already generated or in progress today",
-			});
+			// Only catch unique constraint violations (P2002)
+			// Other errors (DB connection, schema issues) should bubble up
+			if (
+				error &&
+				typeof error === "object" &&
+				"code" in error &&
+				error.code === "P2002"
+			) {
+				// Log entry already exists - another instance is running or completed
+				logger.info({
+					jobName,
+					date: today,
+					message:
+						"Weekly report already generated or in progress today, skipping",
+				});
+				return NextResponse.json({
+					success: true,
+					message: "Report already generated or in progress today",
+				});
+			}
+			// Rethrow other errors to be caught by outer error handler
+			throw error;
 		}
 
 		// Step 3: Generate weekly report
