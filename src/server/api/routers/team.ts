@@ -5,6 +5,7 @@
  * - create: Create a new team with owner as first member
  * - getAll: Get all teams where user is a member
  * - getById: Get team details including members and projects
+ * - getMembers: Get all members of a team (for dropdowns)
  * - update: Update team information (name, budget, owner)
  * - addMember: Add a member to the team
  * - removeMember: Remove a member from the team
@@ -238,6 +239,71 @@ export const teamRouter = createTRPCRouter({
 					apiKeyCount: p._count.apiKeys,
 				})),
 			};
+		}),
+
+	/**
+	 * Get all members of a team
+	 *
+	 * Returns a simplified list of team members for use in dropdowns/selects
+	 * User must be a member of the team to access
+	 */
+	getMembers: protectedProcedure
+		.input(
+			z.object({
+				teamId: z.string(),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			const userId = ctx.session.user.id;
+
+			// Verify user is a member of this team
+			const membership = await db.teamMember.findUnique({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId,
+					},
+				},
+			});
+
+			if (!membership) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You do not have access to this team",
+				});
+			}
+
+			// Get all team members with user info
+			const members = await db.teamMember.findMany({
+				where: {
+					teamId: input.teamId,
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							name: true,
+							email: true,
+						},
+					},
+				},
+				orderBy: [
+					{
+						role: "asc", // owner, admin, member
+					},
+					{
+						createdAt: "asc",
+					},
+				],
+			});
+
+			return members.map((m) => ({
+				id: m.id,
+				userId: m.userId,
+				role: m.role,
+				user: m.user,
+				createdAt: m.createdAt,
+			}));
 		}),
 
 	/**
