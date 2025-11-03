@@ -12,6 +12,8 @@
  * - generateApiKey: Add an API key to a project (project member or Team admin)
  * - getApiKeys: Get all API keys for a project
  * - disableApiKey: Disable an API key (project member or Team admin)
+ * - enableApiKey: Re-enable a disabled API key (project member or Team admin)
+ * - deleteApiKey: Delete an API key permanently (project member or Team admin)
  */
 
 import { TRPCError } from "@trpc/server";
@@ -827,5 +829,151 @@ export const projectRouter = createTRPCRouter({
 			);
 
 			return updated;
+		}),
+
+	/**
+	 * Enable an API key with audit logging
+	 * Project member or Team admin can enable
+	 */
+	enableApiKey: protectedProcedure
+		.input(
+			z.object({
+				apiKeyId: z.string(),
+				reason: z.string().optional(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const userId = ctx.session.user.id;
+
+			// Get API key with project info
+			const apiKey = await db.apiKey.findUnique({
+				where: { id: input.apiKeyId },
+				include: {
+					project: {
+						select: {
+							id: true,
+							teamId: true,
+						},
+					},
+				},
+			});
+
+			if (!apiKey) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "API key not found",
+				});
+			}
+
+			// Ensure user has access to the project
+			await ensureProjectAccess(userId, apiKey.project.id);
+
+			// Enable the API key
+			const updated = await db.apiKey.update({
+				where: { id: input.apiKeyId },
+				data: { isActive: true },
+			});
+
+			// Create audit log
+			await db.auditLog.create({
+				data: {
+					userId,
+					actionType: "api_key_enabled",
+					resourceType: "api_key",
+					resourceId: input.apiKeyId,
+					metadata: {
+						reason: input.reason || "Re-enabled API key",
+						projectId: apiKey.project.id,
+						provider: apiKey.provider,
+					},
+				},
+			});
+
+			logger.info(
+				{
+					apiKeyId: input.apiKeyId,
+					projectId: apiKey.project.id,
+					userId,
+					reason: input.reason,
+				},
+				"API key enabled",
+			);
+
+			return updated;
+		}),
+
+	/**
+	 * Delete an API key permanently with audit logging
+	 * Project member or Team admin can delete
+	 *
+	 * Note: CostData.apiKeyId is nullable, so cascade deletion is safe
+	 */
+	deleteApiKey: protectedProcedure
+		.input(
+			z.object({
+				apiKeyId: z.string(),
+				reason: z.string().min(1, "Reason is required"),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const userId = ctx.session.user.id;
+
+			// Get API key with project info
+			const apiKey = await db.apiKey.findUnique({
+				where: { id: input.apiKeyId },
+				include: {
+					project: {
+						select: {
+							id: true,
+							teamId: true,
+						},
+					},
+				},
+			});
+
+			if (!apiKey) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "API key not found",
+				});
+			}
+
+			// Ensure user has access to the project
+			await ensureProjectAccess(userId, apiKey.project.id);
+
+			// Create audit log before deletion
+			await db.auditLog.create({
+				data: {
+					userId,
+					actionType: "api_key_deleted",
+					resourceType: "api_key",
+					resourceId: input.apiKeyId,
+					metadata: {
+						reason: input.reason,
+						projectId: apiKey.project.id,
+						provider: apiKey.provider,
+						wasActive: apiKey.isActive,
+					},
+				},
+			});
+
+			// Delete the API key (hard delete)
+			// CostData.apiKeyId is nullable, so historical cost data is preserved
+			await db.apiKey.delete({
+				where: { id: input.apiKeyId },
+			});
+
+			logger.info(
+				{
+					apiKeyId: input.apiKeyId,
+					projectId: apiKey.project.id,
+					userId,
+					reason: input.reason,
+					wasActive: apiKey.isActive,
+				},
+				"API key deleted",
+			);
+
+			return { success: true };
 		}),
 });
