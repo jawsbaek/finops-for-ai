@@ -14,7 +14,12 @@ vi.mock("~/lib/logger", () => ({
 }));
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type SlackCostAlertParams, sendCostAlert } from "../webhook";
+import {
+	type SlackCostAlertParams,
+	type SlackDisableNotificationParams,
+	sendCostAlert,
+	sendDisableNotification,
+} from "../webhook";
 
 describe("Slack Webhook Service", () => {
 	let originalEnv: string | undefined;
@@ -286,6 +291,110 @@ describe("Slack Webhook Service", () => {
 				"https://hooks.slack.com/test/",
 				expect.any(Object),
 			);
+		});
+	});
+
+	describe("sendDisableNotification", () => {
+		const mockDisableParams: SlackDisableNotificationParams = {
+			teamName: "Marketing Team",
+			apiKeyLast4: "ab12",
+			reason: "비용 임계값 초과",
+			userName: "admin@example.com",
+			timestamp: "2025-11-03 11:30:00",
+		};
+
+		it("should skip sending when SLACK_WEBHOOK_URL is not configured", async () => {
+			// biome-ignore lint/performance/noDelete: Need to delete env var for test
+			delete process.env.SLACK_WEBHOOK_URL;
+
+			await sendDisableNotification(mockDisableParams);
+
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it("should send disable notification with correct format", async () => {
+			process.env.SLACK_WEBHOOK_URL = "https://hooks.slack.com/test";
+
+			fetchMock.mockResolvedValue({
+				ok: true,
+				status: 200,
+				text: async () => "ok",
+			});
+
+			await sendDisableNotification(mockDisableParams);
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			expect(fetchMock).toHaveBeenCalledWith("https://hooks.slack.com/test", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: expect.stringContaining('"blocks"'),
+			});
+
+			// Parse the payload to verify structure
+			const callArgs = fetchMock.mock.calls[0];
+			const payload = JSON.parse(callArgs?.[1]?.body as string);
+
+			expect(payload.text).toBe("⚠️ [Marketing Team] API 키 비활성화");
+			expect(payload.blocks).toHaveLength(1);
+
+			// Verify section block
+			expect(payload.blocks[0]?.type).toBe("section");
+			expect(payload.blocks[0]?.text?.type).toBe("mrkdwn");
+			expect(payload.blocks[0]?.text?.text).toContain("*⚠️ API 키 비활성화*");
+			expect(payload.blocks[0]?.text?.text).toContain("...ab12");
+			expect(payload.blocks[0]?.text?.text).toContain("비용 임계값 초과");
+			expect(payload.blocks[0]?.text?.text).toContain("admin@example.com");
+			expect(payload.blocks[0]?.text?.text).toContain("2025-11-03 11:30:00");
+		});
+
+		it("should retry on failure", async () => {
+			process.env.SLACK_WEBHOOK_URL = "https://hooks.slack.com/test";
+
+			// Fail once, then succeed
+			fetchMock
+				.mockResolvedValueOnce({
+					ok: false,
+					status: 500,
+					text: async () => "Internal Server Error",
+				})
+				.mockResolvedValueOnce({
+					ok: true,
+					status: 200,
+					text: async () => "ok",
+				});
+
+			vi.useFakeTimers();
+
+			const promise = sendDisableNotification(mockDisableParams);
+
+			// Fast-forward through retry
+			await vi.advanceTimersByTimeAsync(1000);
+
+			await promise;
+
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+
+			vi.useRealTimers();
+		});
+
+		it("should handle different disable reasons", async () => {
+			process.env.SLACK_WEBHOOK_URL = "https://hooks.slack.com/test";
+
+			fetchMock.mockResolvedValue({
+				ok: true,
+				status: 200,
+				text: async () => "ok",
+			});
+
+			await sendDisableNotification({
+				...mockDisableParams,
+				reason: "수동 비활성화 요청",
+			});
+
+			const payload = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
+			expect(payload.blocks[0]?.text?.text).toContain("수동 비활성화 요청");
 		});
 	});
 });

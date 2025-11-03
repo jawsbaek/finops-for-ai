@@ -1,6 +1,75 @@
-# Create T3 App
+# FinOps for AI - SDS
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+A FinOps platform for AI workloads built with the [T3 Stack](https://create.t3.gg/).
+
+## Getting Started
+
+### Development
+
+```bash
+# Install dependencies
+bun install
+
+# Start local development database
+docker run -d \
+  --name finops-test-db \
+  -e POSTGRES_USER="postgres" \
+  -e POSTGRES_PASSWORD="test_password" \
+  -e POSTGRES_DB="finops_test" \
+  -p 5433:5432 \
+  postgres:15-alpine
+
+# Run migrations on test database
+DATABASE_URL="postgresql://postgres:test_password@localhost:5433/finops_test?schema=public" bunx prisma migrate deploy
+
+# Start development server
+bun run dev
+```
+
+### Testing
+
+#### E2E Tests (Playwright)
+
+E2E tests require a local test database:
+
+```bash
+# 1. Start test database (if not already running)
+docker run -d \
+  --name finops-test-db \
+  -e POSTGRES_USER="postgres" \
+  -e POSTGRES_PASSWORD="test_password" \
+  -e POSTGRES_DB="finops_test" \
+  -p 5433:5432 \
+  postgres:15-alpine
+
+# 2. Run migrations
+DATABASE_URL="postgresql://postgres:test_password@localhost:5433/finops_test?schema=public" bunx prisma migrate deploy
+
+# 3. Copy test environment file
+cp .env.test.example .env.test
+
+# 4. Run E2E tests
+bun run test:e2e
+
+# Optional: Run with UI
+bun run test:e2e:ui
+
+# Optional: Debug mode
+bun run test:e2e:debug
+```
+
+#### Unit Tests (Vitest)
+
+```bash
+# Run unit tests
+bun run test
+
+# Run with coverage
+bun run test:coverage
+
+# Run with UI
+bun run test:ui
+```
 
 ## What's next? How do I make an app with this?
 
