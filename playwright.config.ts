@@ -1,4 +1,30 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+
+/**
+ * Load test environment variables from .env.test
+ */
+function loadTestEnv(): Record<string, string> {
+	try {
+		const envFile = readFileSync(".env.test", "utf-8");
+		const env: Record<string, string> = {};
+		for (const line of envFile.split("\n")) {
+			const trimmed = line.trim();
+			if (trimmed && !trimmed.startsWith("#")) {
+				const [key, ...valueParts] = trimmed.split("=");
+				if (key && valueParts.length > 0) {
+					env[key.trim()] = valueParts
+						.join("=")
+						.trim()
+						.replace(/^["']|["']$/g, "");
+				}
+			}
+		}
+		return env;
+	} catch {
+		return {};
+	}
+}
 
 /**
  * Enhanced Playwright Configuration
@@ -91,7 +117,10 @@ export default defineConfig({
 				...devices["Desktop Chrome"],
 				// Enable Chrome DevTools for debugging
 				launchOptions: {
-					args: ["--disable-web-security", "--disable-features=IsolateOrigins,site-per-process"],
+					args: [
+						"--disable-web-security",
+						"--disable-features=IsolateOrigins,site-per-process",
+					],
 				},
 			},
 		},
@@ -136,10 +165,11 @@ export default defineConfig({
 		timeout: 120 * 1000,
 		stdout: "ignore",
 		stderr: "pipe",
+		env: loadTestEnv(),
 	},
 
 	/* Output folder for test artifacts */
-	outputDir: "playwright-report/test-results",
+	outputDir: "test-results",
 
 	/* Folder for snapshots (visual regression) */
 	snapshotDir: "__tests__/e2e/snapshots",
