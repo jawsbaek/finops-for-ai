@@ -38,6 +38,25 @@ else
   echo "Warning: .env not found in repo root; skipping copy."
 fi
 
+# Symlink .env.test to share test configuration across worktrees
+if [ -f ".env.test" ]; then
+  ln -sf "$(pwd)/.env.test" "$worktree_dir/.env.test"
+  echo "Linked .env.test from main repo"
+else
+  echo "Warning: .env.test not found in repo root; skipping symlink."
+fi
+
+# Create .claude directory in worktree if it doesn't exist
+mkdir -p "$worktree_dir/.claude"
+
+# Symlink settings.local.json to share configuration across worktrees
+if [ -f ".claude/settings.local.json" ]; then
+  ln -sf "$(pwd)/.claude/settings.local.json" "$worktree_dir/.claude/settings.local.json"
+  echo "Linked .claude/settings.local.json from main repo"
+else
+  echo "Warning: .claude/settings.local.json not found in repo root; skipping symlink."
+fi
+
 cd "$worktree_dir"
 
 # Run Bun install if available

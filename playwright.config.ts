@@ -66,7 +66,7 @@ export default defineConfig({
 			],
 
 	/* Global setup/teardown */
-	globalSetup: undefined,
+	globalSetup: "./__tests__/globalSetup.ts",
 	globalTeardown: undefined,
 
 	/* Shared settings for all projects */
