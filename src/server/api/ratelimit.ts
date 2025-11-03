@@ -11,58 +11,100 @@ import { Redis } from "@upstash/redis";
 import { env } from "~/env";
 
 /**
- * Initialize Redis client
- * Falls back to mock implementation for local development without Redis
+ * In-memory rate limiter for local development
+ * Uses Map to track requests per identifier
  */
-function createRedisClient() {
-	// Check if Upstash Redis credentials are configured
-	if (env.UPSTASH_REDIS_URL && env.UPSTASH_REDIS_TOKEN) {
-		return new Redis({
-			url: env.UPSTASH_REDIS_URL,
-			token: env.UPSTASH_REDIS_TOKEN,
-		});
+class InMemoryRateLimiter {
+	private requests: Map<string, { count: number; resetAt: number }> = new Map();
+	private maxRequests: number;
+	private windowMs: number;
+
+	constructor(maxRequests: number, windowMs: number) {
+		this.maxRequests = maxRequests;
+		this.windowMs = windowMs;
 	}
 
-	// For local development: use in-memory store (mock)
-	// This allows development to continue without Redis
-	// WARNING: This is NOT suitable for production
+	async limit(identifier: string) {
+		const now = Date.now();
+		const record = this.requests.get(identifier);
+
+		// Clean up expired records
+		if (record && record.resetAt <= now) {
+			this.requests.delete(identifier);
+		}
+
+		const current = this.requests.get(identifier);
+
+		if (!current) {
+			// First request in window
+			const resetAt = now + this.windowMs;
+			this.requests.set(identifier, { count: 1, resetAt });
+			return {
+				success: true,
+				limit: this.maxRequests,
+				remaining: this.maxRequests - 1,
+				reset: resetAt,
+			};
+		}
+
+		if (current.count >= this.maxRequests) {
+			// Rate limit exceeded
+			return {
+				success: false,
+				limit: this.maxRequests,
+				remaining: 0,
+				reset: current.resetAt,
+			};
+		}
+
+		// Increment count
+		current.count++;
+		return {
+			success: true,
+			limit: this.maxRequests,
+			remaining: this.maxRequests - current.count,
+			reset: current.resetAt,
+		};
+	}
+}
+
+/**
+ * Create rate limiters based on environment configuration
+ */
+function createRateLimiters() {
+	const redisUrl = env.UPSTASH_REDIS_URL;
+	const redisToken = env.UPSTASH_REDIS_TOKEN;
+
+	// Production: Use Upstash Redis if configured
+	if (redisUrl && redisToken) {
+		const redis = new Redis({ url: redisUrl, token: redisToken });
+		return {
+			sensitive: new Ratelimit({
+				redis,
+				limiter: Ratelimit.slidingWindow(10, "1 m"),
+				analytics: true,
+				prefix: "ratelimit:sensitive",
+			}),
+			normal: new Ratelimit({
+				redis,
+				limiter: Ratelimit.slidingWindow(100, "1 m"),
+				analytics: true,
+				prefix: "ratelimit:normal",
+			}),
+		};
+	}
+
+	// Development: Use in-memory rate limiter
 	console.warn(
 		"⚠️  UPSTASH_REDIS_URL or UPSTASH_REDIS_TOKEN not found. Using in-memory rate limiting (development only).",
 	);
-
-	// Return a mock Redis client for development
-	// In production, this should fail fast
-	return new Redis({
-		url: "http://localhost:8079",
-		token: "development_token",
-	});
+	return {
+		sensitive: new InMemoryRateLimiter(10, 60 * 1000),
+		normal: new InMemoryRateLimiter(100, 60 * 1000),
+	};
 }
-
-const redis = createRedisClient();
 
 /**
  * Rate limiters for different operation types
  */
-export const rateLimits = {
-	/**
-	 * Sensitive mutations: 10 requests per minute
-	 * Applied to: API key operations, member management, etc.
-	 */
-	sensitive: new Ratelimit({
-		redis,
-		limiter: Ratelimit.slidingWindow(10, "1 m"),
-		analytics: true,
-		prefix: "ratelimit:sensitive",
-	}),
-
-	/**
-	 * Normal operations: 100 requests per minute
-	 * Applied to: Regular queries and mutations
-	 */
-	normal: new Ratelimit({
-		redis,
-		limiter: Ratelimit.slidingWindow(100, "1 m"),
-		analytics: true,
-		prefix: "ratelimit:normal",
-	}),
-};
+export const rateLimits = createRateLimiters();
