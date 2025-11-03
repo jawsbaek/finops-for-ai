@@ -27,6 +27,19 @@ function loadTestEnv(): Record<string, string> {
 }
 
 /**
+ * Filter out undefined values from process.env
+ */
+function getDefinedEnv(): Record<string, string> {
+	const result: Record<string, string> = {};
+	for (const [key, value] of Object.entries(process.env)) {
+		if (value !== undefined) {
+			result[key] = value;
+		}
+	}
+	return result;
+}
+
+/**
  * Enhanced Playwright Configuration
  * Includes accessibility testing, performance monitoring, and visual regression
  *
@@ -158,7 +171,9 @@ export default defineConfig({
 		timeout: 120 * 1000,
 		stdout: "ignore",
 		stderr: "pipe",
-		env: loadTestEnv(),
+		// Merge process.env with test env to preserve PATH and other shell variables
+		// Filter out undefined values to satisfy Playwright's type requirements
+		env: { ...getDefinedEnv(), ...loadTestEnv() },
 	},
 
 	/* Output folder for test artifacts */
