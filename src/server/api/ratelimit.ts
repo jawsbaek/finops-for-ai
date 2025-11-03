@@ -94,8 +94,8 @@ class InMemoryRateLimiter {
  * Create rate limiters based on environment configuration
  */
 function createRateLimiters() {
-	const redisUrl = env.UPSTASH_REDIS_URL;
-	const redisToken = env.UPSTASH_REDIS_TOKEN;
+	const redisUrl = env.UPSTASH_REDIS_REST_URL;
+	const redisToken = env.UPSTASH_REDIS_REST_TOKEN;
 
 	// Production: Use Upstash Redis if configured
 	if (redisUrl && redisToken) {
@@ -119,14 +119,14 @@ function createRateLimiters() {
 	// Production: Fail fast if Redis is not configured
 	if (env.NODE_ENV === "production") {
 		throw new Error(
-			"UPSTASH_REDIS_URL and UPSTASH_REDIS_TOKEN are required in production. " +
+			"UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production. " +
 				"In-memory rate limiting is not suitable for production use.",
 		);
 	}
 
 	// Development: Use in-memory rate limiter
 	console.warn(
-		"⚠️  UPSTASH_REDIS_URL or UPSTASH_REDIS_TOKEN not found. Using in-memory rate limiting (development only).",
+		"⚠️  UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN not found. Using in-memory rate limiting (development only).",
 	);
 	return {
 		sensitive: new InMemoryRateLimiter(10, 60 * 1000),
