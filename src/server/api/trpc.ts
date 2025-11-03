@@ -11,6 +11,7 @@ import { TRPCError, initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
+import { logger } from "~/lib/logger";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 import { rateLimits } from "./ratelimit";
@@ -153,6 +154,18 @@ const rateLimitMiddleware = (type: "sensitive" | "normal") =>
 
 		if (!success) {
 			const retryAfterSeconds = Math.ceil((reset - Date.now()) / 1000);
+
+			// Log rate limit violation for security monitoring
+			logger.warn(
+				{
+					identifier,
+					limitType: type,
+					limit,
+					retryAfterSeconds,
+				},
+				"Rate limit exceeded",
+			);
+
 			throw new TRPCError({
 				code: "TOO_MANY_REQUESTS",
 				message: `Rate limit exceeded. Please try again in ${retryAfterSeconds} seconds.`,
