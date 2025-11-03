@@ -14,8 +14,8 @@ vi.mock("~/lib/logger", () => ({
 }));
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { retryWithBackoff } from "../retry";
 import { logger } from "~/lib/logger";
+import { retryWithBackoff } from "../retry";
 
 describe("Retry Utility", () => {
 	beforeEach(() => {
