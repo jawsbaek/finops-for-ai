@@ -31,9 +31,9 @@ Each epic includes:
 
 **목표**: OpenAI API 비용 추적, 실시간 폭주 방지, 행동 유도 리포트를 통해 즉각적인 가치 제공
 
-**기간**: Week 1-6
+**기간**: Week 1-8 (확장됨: 보안 강화 및 최적화 포함)
 
-**예상 스토리 수**: 9개
+**예상 스토리 수**: 13개 (기존 9개 + 프로젝트 관리 4개)
 
 **가치 제안**:
 - 첫 주부터 OpenAI 비용 가시성 확보
@@ -243,6 +243,126 @@ Each epic includes:
 - Test framework: Cypress for E2E, Jest for unit/integration
 - Monitoring: Set up Datadog/New Relic for uptime tracking
 - Pilot user: Recruit from internal teams or friendly customers
+
+---
+
+### Story 1.10: 프로젝트 멤버 및 API 키 관리 UI
+
+**As a** 프로젝트 관리자,
+**I want** 프로젝트 멤버를 추가/제거하고 API 키의 전체 생명주기를 관리할 수 있는 UI를,
+**So that** 프로젝트별 접근 권한과 API 키를 효율적으로 통제할 수 있다.
+
+**Acceptance Criteria:**
+1. 프로젝트 상세 페이지에 "프로젝트 멤버" 섹션이 표시되어야 한다
+2. 현재 프로젝트 멤버 목록이 카드 형태로 표시되어야 하며, 멤버 추가/제거가 가능해야 한다
+3. "멤버 추가" 모달에서 팀 멤버 드롭다운으로 사용자를 선택할 수 있어야 한다 (이미 추가된 멤버는 비활성화)
+4. 프로젝트 상세 페이지에 "API 키 관리" 섹션이 표시되어야 한다
+5. API 키 추가 모달에서 provider 선택 및 API 키 입력이 가능해야 한다 (password 타입 마스킹)
+6. OpenAI API 키는 "sk-"로 시작하는지 클라이언트 측에서 검증해야 한다
+7. API 키 상태에 따라 "활성화", "차단", "영구 삭제" 버튼이 표시되어야 한다
+8. 차단/삭제 시 type-to-confirm 다이얼로그(사유 입력 + 확인 텍스트 입력)가 표시되어야 한다
+9. 모든 API 키 작업(생성, 차단, 활성화, 삭제)이 audit log에 기록되어야 한다
+10. 모든 작업 중 로딩 상태가 명확히 표시되고, 성공/실패 시 toast 알림이 표시되어야 한다
+
+**Prerequisites:** Story 1.7, Story 1.8
+
+**Status:** ✅ COMPLETED (2025-11-03)
+
+**Technical Notes:**
+- Backend APIs: `project.enableApiKey`, `project.deleteApiKey`, `team.getMembers`
+- Frontend Components: `AddMemberDialog`, `AddApiKeyDialog`, `ConfirmDeleteKeyDialog`
+- Permission model: Team admin for member management, project member for API key management
+- See detailed documentation: `docs/stories/1-10-프로젝트-멤버-및-api-키-관리-ui.md`
+
+---
+
+### Story 1.11: 보안 강화 - API 키 노출 방지 및 Rate Limiting
+
+**As a** 보안 관리자,
+**I want** API 키 노출 위험을 제거하고 민감한 작업에 rate limiting을 적용하여,
+**So that** 시스템이 보안 공격과 남용으로부터 보호될 수 있다.
+
+**Acceptance Criteria:**
+1. Prisma schema에 `ApiKey.last4` 필드가 추가되어야 한다 (String, indexed)
+2. API 키 생성 시 last4 값을 계산하여 저장해야 한다
+3. API 키 조회 시 `encryptedKey`를 반환하지 않고 `last4`만 반환해야 한다
+4. Upstash Redis 기반 rate limiting이 구현되어야 한다
+5. 민감한 mutations(API 키 생성/차단/활성화/삭제, 멤버 추가/제거)에 10 req/min 제한이 적용되어야 한다
+6. 일반 조회 operations에 100 req/min 제한이 적용되어야 한다
+7. Rate limit 초과 시 명확한 한국어 에러 메시지가 반환되어야 한다
+8. 모든 사용자 입력(사유, 프로젝트명 등)에 sanitization이 적용되어야 한다 (XSS 방지)
+9. 보안 테스트(rate limiting, XSS, API key exposure)가 통과해야 한다
+
+**Prerequisites:** Story 1.10
+
+**Priority:** 🔴 CRITICAL
+
+**Technical Notes:**
+- Database migration: Add `last4` field + index
+- Libraries: `@upstash/ratelimit`, `sanitize-html`
+- Rate limit middleware: IP-based + User ID-based dual limiting
+- See detailed documentation: `docs/stories/1-11-보안-강화-api-키-노출-방지-및-rate-limiting.md`
+
+---
+
+### Story 1.12: 성능 최적화 - 쿼리 최적화 및 인덱스 추가
+
+**As a** 시스템 사용자,
+**I want** 프로젝트 상세 페이지와 멤버 관리 기능이 빠르게 로드되어,
+**So that** 대기 시간 없이 효율적으로 작업할 수 있다.
+
+**Acceptance Criteria:**
+1. `team.getMembers` 쿼리가 단일 쿼리로 최적화되어야 한다 (permission check 통합)
+2. `project.getMembers` 쿼리가 최적화되어야 한다 (N+1 query 제거)
+3. 프로젝트 상세 페이지 초기 로딩이 병렬 쿼리로 최적화되어야 한다 (query waterfall 해결)
+4. Database indexes가 추가되어야 한다:
+   - `ProjectMember`: `userId`, `(projectId, userId)`
+   - `ApiKey`: `(projectId, isActive)`
+   - `AuditLog`: `userId`, `(resourceType, resourceId)`, `actionType`, `createdAt`
+5. React Query staleTime이 적절히 설정되어야 한다 (멤버: 5분, API 키: 1분)
+6. 페이지 로딩 시간이 50% 이상 단축되어야 한다 (600ms → 200ms)
+7. Database connection pool이 최적화되어야 한다 (connection_limit=20)
+8. Prisma query logging으로 쿼리 수 감소 확인 (before: 2 queries → after: 1 query)
+
+**Prerequisites:** Story 1.10
+
+**Priority:** 🟡 MEDIUM
+
+**Technical Notes:**
+- Single query optimization: Fetch all data + in-memory permission check
+- Indexes: Compound indexes for join queries
+- Server-side prefetch: `createServerSideHelpers` for parallel data fetching
+- See detailed documentation: `docs/stories/1-12-성능-최적화-쿼리-최적화-및-인덱스-추가.md`
+
+---
+
+### Story 1.13: 국제화 및 데이터 무결성 개선
+
+**As a** 한국어 사용자,
+**I want** 모든 에러 메시지와 시스템 메시지가 한국어로 표시되고 데이터 무결성이 보장되어,
+**So that** 일관된 사용자 경험과 신뢰할 수 있는 시스템을 이용할 수 있다.
+
+**Acceptance Criteria:**
+1. `src/lib/error-messages.ts` 파일이 생성되어 모든 에러 메시지가 한국어로 관리되어야 한다
+2. 모든 backend 에러 메시지가 한국어로 변환되어야 한다 (`team.ts`: 5개, `project.ts`: 12개)
+3. Zod validation 에러 메시지도 한국어로 설정되어야 한다
+4. Critical operations(API 키 차단/활성화/삭제)에 transaction이 적용되어야 한다
+5. Audit log 생성과 실제 작업이 atomic transaction으로 실행되어야 한다
+6. 모든 string 입력에 max length 제한이 설정되어야 한다 (reason: 500자, name: 100자)
+7. 프론트엔드에도 동일한 validation이 적용되어 즉각적 피드백을 제공해야 한다
+8. 에러 로깅이 표준화되어야 한다 (`src/lib/logger.ts` 사용)
+9. 모든 에러 시나리오에서 한국어 메시지가 표시되는지 테스트되어야 한다
+
+**Prerequisites:** Story 1.10
+
+**Priority:** 🟢 LOW
+
+**Technical Notes:**
+- Error message constants: Centralized in `error-messages.ts`
+- Transaction pattern: `db.$transaction([auditLog.create, apiKey.delete])`
+- Validation: Zod schema with Korean error messages
+- Frontend validation: `react-hook-form` + `zodResolver`
+- See detailed documentation: `docs/stories/1-13-국제화-및-데이터-무결성-개선.md`
 
 ---
 
