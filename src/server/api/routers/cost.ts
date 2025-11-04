@@ -13,6 +13,7 @@
 import { TRPCError } from "@trpc/server";
 import { endOfDay, startOfWeek, subDays } from "date-fns";
 import { z } from "zod";
+import { ERROR_MESSAGES } from "~/lib/error-messages";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { db } from "~/server/db";
 
@@ -48,7 +49,7 @@ export const costRouter = createTRPCRouter({
 				if (!hasAccess) {
 					throw new TRPCError({
 						code: "FORBIDDEN",
-						message: "You do not have access to this team",
+						message: ERROR_MESSAGES.COST_TEAM_ACCESS_DENIED,
 					});
 				}
 			}
@@ -242,7 +243,7 @@ export const costRouter = createTRPCRouter({
 				if (!hasAccess) {
 					throw new TRPCError({
 						code: "FORBIDDEN",
-						message: "You do not have access to this team",
+						message: ERROR_MESSAGES.COST_TEAM_ACCESS_DENIED,
 					});
 				}
 			}
@@ -574,7 +575,7 @@ export const costRouter = createTRPCRouter({
 				if (!hasAccess) {
 					throw new TRPCError({
 						code: "FORBIDDEN",
-						message: "You do not have access to this team",
+						message: ERROR_MESSAGES.COST_TEAM_ACCESS_DENIED,
 					});
 				}
 			}
