@@ -264,3 +264,16 @@ model WeeklyReport {
   @@index([weekStart])
   @@map("weekly_reports")
 }
+
+// Security: Track login attempts to prevent brute force attacks
+model LoginAttempt {
+  id          String   @id @default(cuid())
+  email       String
+  ipAddress   String   @map("ip_address")
+  successful  Boolean
+  attemptedAt DateTime @default(now()) @map("attempted_at")
+
+  @@index([email, attemptedAt])
+  @@index([ipAddress, attemptedAt])
+  @@map("login_attempts")
+}
