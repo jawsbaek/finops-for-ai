@@ -38,6 +38,11 @@ AWS_KMS_KEY_ID="arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-1
 # Vercel Cron
 CRON_SECRET="your-cron-secret-key" # Generate: openssl rand -base64 32
 
+# Feature Flags
+# Enable Costs API (OpenAI organization-level cost collection)
+# Set to "true" to use Costs API, "false" to use legacy Usage API
+ENABLE_COSTS_API="false"
+
 # Resend (Email Notifications)
 RESEND_API_KEY="re_123456789"
 ADMIN_EMAIL="admin@yourcompany.com"
@@ -407,14 +412,37 @@ The system now uses **Costs API** as the primary data source:
 | **Data Delay** | 8-24 hours | 8-24 hours |
 | **API Version** | `usage_v1` | `costs_v1` |
 
-### 7.2. Backward Compatibility
+### 7.2. Feature Flag: ENABLE_COSTS_API
+
+The system uses a **feature flag** to toggle between Usage API and Costs API:
+
+**Environment Variable:**
+```bash
+ENABLE_COSTS_API="false"  # Use Usage API (legacy)
+ENABLE_COSTS_API="true"   # Use Costs API (new)
+```
+
+**Behavior:**
+- **"false" (default)**: System uses Usage API with project-level API keys
+- **"true"**: System uses Costs API with team-level Admin API keys
+
+**When to Enable:**
+1. After registering team Admin API keys (Section 3.2)
+2. After registering project OpenAI Project IDs (Section 3.3)
+3. After validating setup with scripts (Section 3.4)
+
+**Rollback:**
+- If issues occur, set `ENABLE_COSTS_API="false"` to revert to Usage API
+- Both APIs can coexist (see Section 7.3)
+
+### 7.3. Backward Compatibility
 
 The schema supports **both APIs simultaneously**:
 - Old data: `apiVersion='usage_v1'`, has `model`, `tokens`, `snapshotId`
 - New data: `apiVersion='costs_v1'`, has `bucketStartTime`, `lineItem`, `currency`
 - Dashboard aggregates both versions
 
-### 7.3. Migration Path
+### 7.4. Migration Path
 
 ```bash
 # If you have existing Usage API data:

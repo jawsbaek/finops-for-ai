@@ -2268,9 +2268,33 @@ Usage API → Costs API 전환, Team-level Admin Key + Project ID 패턴 채택
 - 기존 Usage API 데이터 마이그레이션 필요
 
 **롤백 계획**:
-- Feature flag: ENABLE_COSTS_API
+- Feature flag: `ENABLE_COSTS_API` environment variable
+  - `"false"` (default): Uses Usage API with project-level keys
+  - `"true"`: Uses Costs API with team-level Admin keys
 - 두 API 병행 운영 가능 (apiVersion으로 구분)
+- 문제 발생 시 즉시 롤백: `ENABLE_COSTS_API="false"` 설정
 - Breaking Changes 문서 참조: [BREAKING_CHANGES.md](./migration/BREAKING_CHANGES.md)
+
+**환경 변수 설정**:
+```bash
+# .env 파일
+ENABLE_COSTS_API="false"  # Legacy Usage API
+ENABLE_COSTS_API="true"   # New Costs API
+```
+
+**사용 예시**:
+```typescript
+// src/app/api/cron/daily-batch/route.ts
+const useCostsAPI = env.ENABLE_COSTS_API === "true";
+
+if (useCostsAPI) {
+  // Use Costs API (organization-level)
+  await collectDailyCostsV2(team.id, targetDate);
+} else {
+  // Use Usage API (project-level)
+  await collectDailyCosts(team.id, targetDate);
+}
+```
 
 ---
 
