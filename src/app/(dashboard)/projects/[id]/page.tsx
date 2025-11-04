@@ -2,10 +2,7 @@
 
 import { CostChart, type CostDataPoint } from "@/components/custom";
 import { StatCard } from "@/components/custom/stat-card";
-import { AddApiKeyDialog } from "@/components/dialogs/AddApiKeyDialog";
 import { AddMemberDialog } from "@/components/dialogs/AddMemberDialog";
-import { ConfirmDeleteKeyDialog } from "@/components/dialogs/ConfirmDeleteKeyDialog";
-import { ConfirmDisableKeyDialog } from "@/components/dialogs/ConfirmDisableKeyDialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,11 +17,9 @@ import {
 import {
 	ArrowLeft,
 	DollarSign,
-	Key,
 	Loader2,
-	RotateCcw,
 	Save,
-	ShieldAlert,
+	Settings,
 	Trash2,
 	TrendingUp,
 	UserPlus,
@@ -48,18 +43,6 @@ export default function ProjectDetailPage() {
 	// State for metrics form
 	const [successCount, setSuccessCount] = useState<string>("");
 	const [feedbackScore, setFeedbackScore] = useState<string>("");
-
-	// State for API key dialogs
-	const [addApiKeyDialogOpen, setAddApiKeyDialogOpen] = useState(false);
-	const [apiKeyServerError, setApiKeyServerError] = useState<
-		string | undefined
-	>(undefined);
-	const [disableDialogOpen, setDisableDialogOpen] = useState(false);
-	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-	const [selectedApiKeyId, setSelectedApiKeyId] = useState<string | null>(null);
-	const [selectedApiKeyLast4, setSelectedApiKeyLast4] = useState<
-		string | undefined
-	>(undefined);
 
 	// State for member dialog
 	const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
@@ -123,72 +106,6 @@ export default function ProjectDetailPage() {
 		},
 	});
 
-	// Generate API key mutation
-	const generateApiKey = api.project.generateApiKey.useMutation({
-		onMutate: () => {
-			// Clear previous error before mutation starts (prevents race conditions)
-			setApiKeyServerError(undefined);
-		},
-		onSuccess: () => {
-			toast.success("API 키가 추가되었습니다", {
-				description: "API 키가 안전하게 암호화되어 저장되었습니다",
-			});
-			setAddApiKeyDialogOpen(false);
-			void utils.project.getById.invalidate({ id: projectId });
-		},
-		onError: (error) => {
-			// Show error in dialog instead of toast so user can see it
-			setApiKeyServerError(error.message);
-		},
-	});
-
-	// Disable API key mutation
-	const disableApiKey = api.project.disableApiKey.useMutation({
-		onSuccess: () => {
-			toast.success("API 키가 비활성화되었습니다", {
-				description: "이 키를 사용하는 모든 요청이 차단됩니다",
-			});
-			setDisableDialogOpen(false);
-			setSelectedApiKeyId(null);
-			setSelectedApiKeyLast4(undefined);
-			void utils.project.getById.invalidate({ id: projectId });
-		},
-		onError: (error) => {
-			toast.error("API 키 비활성화 실패", {
-				description: error.message,
-			});
-		},
-	});
-
-	// Enable API key mutation
-	const enableApiKey = api.project.enableApiKey.useMutation({
-		onSuccess: () => {
-			toast.success("API 키가 재활성화되었습니다");
-			void utils.project.getById.invalidate({ id: projectId });
-		},
-		onError: (error) => {
-			toast.error("API 키 재활성화 실패", {
-				description: error.message,
-			});
-		},
-	});
-
-	// Delete API key mutation
-	const deleteApiKey = api.project.deleteApiKey.useMutation({
-		onSuccess: () => {
-			toast.success("API 키가 영구 삭제되었습니다");
-			setDeleteDialogOpen(false);
-			setSelectedApiKeyId(null);
-			setSelectedApiKeyLast4(undefined);
-			void utils.project.getById.invalidate({ id: projectId });
-		},
-		onError: (error) => {
-			toast.error("API 키 삭제 실패", {
-				description: error.message,
-			});
-		},
-	});
-
 	// Handle metrics form submission
 	const handleUpdateMetrics = () => {
 		const count = Number.parseInt(successCount, 10);
@@ -212,65 +129,6 @@ export default function ProjectDetailPage() {
 			successCount: count,
 			feedbackScore: score,
 		});
-	};
-
-	// Handle disable API key
-	const handleOpenDisableDialog = (apiKeyId: string, last4: string) => {
-		setSelectedApiKeyId(apiKeyId);
-		setSelectedApiKeyLast4(last4);
-		setDisableDialogOpen(true);
-	};
-
-	const handleConfirmDisable = (reason: string) => {
-		if (!selectedApiKeyId) return;
-
-		disableApiKey.mutate({
-			apiKeyId: selectedApiKeyId,
-			reason,
-		});
-	};
-
-	// Handle enable API key
-	const handleEnableApiKey = (apiKeyId: string) => {
-		enableApiKey.mutate({
-			apiKeyId,
-			reason: "API key re-enabled from project dashboard",
-		});
-	};
-
-	// Handle open delete API key dialog
-	const handleOpenDeleteDialog = (apiKeyId: string, last4: string) => {
-		setSelectedApiKeyId(apiKeyId);
-		setSelectedApiKeyLast4(last4);
-		setDeleteDialogOpen(true);
-	};
-
-	// Handle confirm delete API key
-	const handleConfirmDelete = (reason: string) => {
-		if (!selectedApiKeyId) return;
-
-		deleteApiKey.mutate({
-			apiKeyId: selectedApiKeyId,
-			reason,
-		});
-	};
-
-	// Handle add API key
-	const handleAddApiKey = (provider: "openai", apiKey: string) => {
-		generateApiKey.mutate({
-			projectId,
-			provider,
-			apiKey,
-		});
-	};
-
-	// Handle API key dialog open change
-	const handleAddApiKeyDialogOpenChange = (open: boolean) => {
-		setAddApiKeyDialogOpen(open);
-		// Clear server error when dialog opens/closes
-		if (!open) {
-			setApiKeyServerError(undefined);
-		}
 	};
 
 	// Handle add member
@@ -487,125 +345,51 @@ export default function ProjectDetailPage() {
 				)}
 			</Card>
 
-			{/* API Keys Management Section */}
+			{/* AI Provider Configuration Section */}
 			<Card className="p-6">
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-3">
-						<Key className="h-5 w-5 text-primary" />
+						<Settings className="h-5 w-5 text-primary" />
 						<div>
 							<h3 className="font-semibold text-foreground text-lg">
-								API 키 관리
+								AI 제공자 설정
 							</h3>
 							<p className="mt-1 text-muted-foreground text-sm">
-								프로젝트의 API 키를 추가하고 관리합니다
+								AI 서비스 제공자의 프로젝트를 연결하여 비용 데이터를 수집합니다
 							</p>
 						</div>
 					</div>
-					<Button
-						data-testid="add-api-key-button"
-						onClick={() => setAddApiKeyDialogOpen(true)}
-						disabled={generateApiKey.isPending}
-					>
-						<Key className="mr-2 h-4 w-4" />
-						API 키 추가
-					</Button>
+					<Link href={`/projects/${projectId}/settings`}>
+						<Button variant="default">
+							<Settings className="mr-2 h-4 w-4" />
+							설정으로 이동
+						</Button>
+					</Link>
 				</div>
 
-				{project.apiKeys && project.apiKeys.length > 0 ? (
-					<div className="mt-6 space-y-3">
-						{project.apiKeys.map((apiKey) => (
-							<div
-								key={apiKey.id}
-								className="flex items-center justify-between rounded-lg border border-border bg-card p-4"
-							>
-								<div className="space-y-1">
-									<div className="flex items-center gap-2">
-										<p className="font-medium text-foreground text-sm capitalize">
-											{apiKey.provider} API Key
-										</p>
-										{apiKey.isActive ? (
-											<span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary text-xs">
-												<span className="h-1.5 w-1.5 rounded-full bg-primary" />
-												활성
-											</span>
-										) : (
-											<span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
-												<span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-												비활성
-											</span>
-										)}
-									</div>
-									<p className="font-mono text-muted-foreground text-xs">
-										키: ...{apiKey.last4}
-									</p>
-									<p className="text-muted-foreground text-xs">
-										생성일:{" "}
-										{new Date(apiKey.createdAt).toLocaleDateString("ko-KR", {
-											year: "numeric",
-											month: "long",
-											day: "numeric",
-										})}
-									</p>
-								</div>
-								<div className="flex items-center gap-2">
-									{apiKey.isActive ? (
-										<Button
-											variant="destructive"
-											size="sm"
-											onClick={() =>
-												handleOpenDisableDialog(apiKey.id, apiKey.last4)
-											}
-											disabled={disableApiKey.isPending}
-										>
-											<ShieldAlert className="mr-2 h-4 w-4" />
-											비활성화
-										</Button>
-									) : (
-										<Button
-											variant="default"
-											size="sm"
-											onClick={() => handleEnableApiKey(apiKey.id)}
-											disabled={enableApiKey.isPending}
-										>
-											<RotateCcw className="mr-2 h-4 w-4" />
-											재활성화
-										</Button>
-									)}
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() =>
-											handleOpenDeleteDialog(apiKey.id, apiKey.last4)
-										}
-										disabled={deleteApiKey.isPending}
-										className="text-destructive hover:text-destructive"
-									>
-										<Trash2 className="h-4 w-4" />
-									</Button>
-								</div>
-							</div>
-						))}
-					</div>
-				) : (
-					<div className="mt-6 flex flex-col items-center justify-center rounded-lg border border-border border-dashed py-12">
-						<Key className="mb-3 h-10 w-10 text-muted-foreground" />
-						<p className="text-center text-muted-foreground text-sm">
-							등록된 API 키가 없습니다
-						</p>
-					</div>
-				)}
-
-				{/* Information */}
 				<div className="mt-6 rounded-lg border border-border bg-muted p-4">
-					<p className="font-semibold text-foreground text-sm">참고사항</p>
-					<ul className="mt-2 ml-4 list-disc space-y-1 text-muted-foreground text-xs">
-						<li>API 키는 암호화되어 안전하게 저장됩니다</li>
-						<li>
-							API 키 비활성화 시 이 키를 사용하는 모든 애플리케이션이 즉시
-							중단됩니다
-						</li>
-						<li>비활성화 및 삭제 이벤트는 감사 로그에 자동으로 기록됩니다</li>
-					</ul>
+					<p className="font-semibold text-foreground text-sm">
+						{project.aiProvider && project.aiProjectId
+							? "✅ AI 제공자 연결됨"
+							: "⚠️  AI 제공자 미연결"}
+					</p>
+					{project.aiProvider && project.aiProjectId ? (
+						<div className="mt-2 space-y-1 text-muted-foreground text-sm">
+							<p>
+								<strong>제공자:</strong>{" "}
+								{project.aiProvider.charAt(0).toUpperCase() +
+									project.aiProvider.slice(1)}
+							</p>
+							<p>
+								<strong>프로젝트 ID:</strong> {project.aiProjectId}
+							</p>
+						</div>
+					) : (
+						<p className="mt-2 text-muted-foreground text-sm">
+							프로젝트 설정에서 AI 제공자를 연결하면 자동으로 비용 데이터를
+							수집합니다
+						</p>
+					)}
 				</div>
 			</Card>
 
@@ -737,30 +521,6 @@ export default function ProjectDetailPage() {
 				isLoading={addMember.isPending}
 				teamMembers={teamMembers || []}
 				existingMemberUserIds={projectMembers?.map((m) => m.userId) || []}
-			/>
-
-			<AddApiKeyDialog
-				open={addApiKeyDialogOpen}
-				onOpenChange={handleAddApiKeyDialogOpenChange}
-				onConfirm={handleAddApiKey}
-				isLoading={generateApiKey.isPending}
-				serverError={apiKeyServerError}
-			/>
-
-			<ConfirmDisableKeyDialog
-				open={disableDialogOpen}
-				onOpenChange={setDisableDialogOpen}
-				onConfirm={handleConfirmDisable}
-				isLoading={disableApiKey.isPending}
-				apiKeyLast4={selectedApiKeyLast4}
-			/>
-
-			<ConfirmDeleteKeyDialog
-				open={deleteDialogOpen}
-				onOpenChange={setDeleteDialogOpen}
-				onConfirm={handleConfirmDelete}
-				isLoading={deleteApiKey.isPending}
-				apiKeyLast4={selectedApiKeyLast4}
 			/>
 		</div>
 	);
