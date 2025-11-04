@@ -54,13 +54,25 @@ export async function validateProviderProjectId(
 		}
 		case "anthropic":
 			// TODO: Implement Anthropic validation
-			return { valid: true }; // Placeholder
+			return {
+				valid: false,
+				error:
+					"Anthropic validation not yet implemented. Please contact support to enable this provider.",
+			};
 		case "aws":
 			// TODO: Implement AWS validation
-			return { valid: true }; // Placeholder
+			return {
+				valid: false,
+				error:
+					"AWS validation not yet implemented. Please contact support to enable this provider.",
+			};
 		case "azure":
 			// TODO: Implement Azure validation
-			return { valid: true }; // Placeholder
+			return {
+				valid: false,
+				error:
+					"Azure validation not yet implemented. Please contact support to enable this provider.",
+			};
 		default:
 			return { valid: false, error: "Unsupported provider" };
 	}

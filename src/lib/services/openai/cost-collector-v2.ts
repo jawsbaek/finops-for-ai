@@ -235,6 +235,20 @@ export async function collectDailyCostsV2(
 	// 2. Process each organization separately
 	for (const orgApiKey of orgApiKeys) {
 		try {
+			// Verify key is still active before decrypting (prevent race condition)
+			const currentKey = await db.organizationApiKey.findUnique({
+				where: { id: orgApiKey.id },
+				select: { isActive: true },
+			});
+
+			if (!currentKey?.isActive) {
+				logger.warn(
+					{ orgId: orgApiKey.organizationId },
+					"Admin key was deactivated during processing, skipping",
+				);
+				continue;
+			}
+
 			// Decrypt Admin API Key
 			const decryptedKey = await retryWithBackoff(
 				() =>
@@ -247,16 +261,34 @@ export async function collectDailyCostsV2(
 			);
 
 			// 3. Get all projects for this team + organization
+			// Support both new multi-org fields and legacy openaiProjectId
 			const projects = await db.project.findMany({
 				where: {
 					teamId,
-					aiProvider: orgApiKey.provider,
-					aiOrganizationId: orgApiKey.organizationId,
-					aiProjectId: { not: null },
+					OR: [
+						// New multi-org projects
+						{
+							aiProvider: orgApiKey.provider,
+							aiOrganizationId: orgApiKey.organizationId,
+							aiProjectId: { not: null },
+						},
+						// Legacy OpenAI projects (backward compatibility)
+						...(orgApiKey.provider === "openai"
+							? [
+									{
+										aiProvider: null,
+										aiOrganizationId: null,
+										aiProjectId: null,
+										openaiProjectId: { not: null },
+									},
+								]
+							: []),
+					],
 				},
 				select: {
 					id: true,
 					aiProjectId: true,
+					openaiProjectId: true, // Include legacy field
 				},
 			});
 
@@ -273,10 +305,11 @@ export async function collectDailyCostsV2(
 			}
 
 			// Create mapping: AI Project ID → Internal Project ID
+			// Support both new aiProjectId and legacy openaiProjectId
 			const projectIdMap = new Map(
 				projects
-					.filter((p) => p.aiProjectId != null)
-					.map((p) => [p.aiProjectId as string, p.id]),
+					.filter((p) => p.aiProjectId != null || p.openaiProjectId != null)
+					.map((p) => [(p.aiProjectId ?? p.openaiProjectId) as string, p.id]),
 			);
 			const aiProjectIds = Array.from(projectIdMap.keys());
 
@@ -390,32 +423,32 @@ export async function storeCostDataV2(
 
 	logger.info({ count: costData.length }, "Storing cost data to database");
 
-	// Transform and insert cost data
-	const createPromises = costData.map((data) =>
-		db.costData.create({
-			data: {
-				projectId: data.projectId,
-				provider: data.provider,
-				service: data.service,
-				cost: data.cost,
-				date: data.bucketStartTime, // Use start time as the date
-				bucketStartTime: data.bucketStartTime,
-				bucketEndTime: data.bucketEndTime,
-				lineItem: data.lineItem,
-				currency: data.currency,
-				apiVersion: data.apiVersion,
-				taskType: data.taskType,
-				userIntent: data.userIntent,
-			},
-		}),
-	);
+	// Transform cost data for bulk insert
+	const dataToInsert = costData.map((data) => ({
+		projectId: data.projectId,
+		provider: data.provider,
+		service: data.service,
+		cost: data.cost,
+		date: data.bucketStartTime, // Use start time as the date
+		bucketStartTime: data.bucketStartTime,
+		bucketEndTime: data.bucketEndTime,
+		lineItem: data.lineItem,
+		currency: data.currency,
+		apiVersion: data.apiVersion,
+		taskType: data.taskType,
+		userIntent: data.userIntent,
+	}));
 
-	await Promise.all(createPromises);
+	// Use createMany with skipDuplicates to handle retries idempotently
+	const result = await db.costData.createMany({
+		data: dataToInsert,
+		skipDuplicates: true,
+	});
 
 	logger.info(
-		{ storedCount: costData.length },
+		{ storedCount: result.count, attemptedCount: costData.length },
 		"Cost data stored successfully",
 	);
 
-	return costData.length;
+	return result.count;
 }

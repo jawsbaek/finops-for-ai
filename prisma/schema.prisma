@@ -135,8 +135,9 @@ model Project {
   @@unique([aiProvider, aiOrganizationId, aiProjectId], name: "unique_provider_org_project")
   @@index([teamId])
   @@index([openaiProjectId])
-  // NEW: Index for cost collection queries
+  // NEW: Indexes for cost collection queries
   @@index([aiProvider, aiOrganizationId])
+  @@index([teamId, aiProvider, aiOrganizationId])
   @@map("projects")
 }
 
