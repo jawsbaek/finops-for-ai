@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -9,7 +10,6 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-	DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,14 +23,14 @@ import {
 import { Separator } from "@/components/ui/separator";
 import {
 	AlertTriangle,
-	Check,
-	Copy,
+	Folder,
 	Key,
 	Loader2,
 	Plus,
-	ShieldAlert,
+	Settings,
 	Users,
 } from "lucide-react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -41,13 +41,15 @@ export default function TeamDetailPage() {
 	const router = useRouter();
 	const teamId = params.teamId as string;
 
-	const [disableDialogOpen, setDisableDialogOpen] = useState(false);
 	const [inviteMemberDialogOpen, setInviteMemberDialogOpen] = useState(false);
 	const [inviteEmail, setInviteEmail] = useState("");
 	const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
 
 	// Fetch team data
 	const { data: team, isLoading } = api.team.getById.useQuery({ teamId });
+
+	// Fetch admin keys status
+	const { data: adminKeys } = api.team.getAdminApiKeys.useQuery({ teamId });
 
 	// Get utils
 	const utils = api.useUtils();
@@ -81,17 +83,6 @@ export default function TeamDetailPage() {
 		});
 	};
 
-	const copyToClipboard = (text: string) => {
-		navigator.clipboard
-			.writeText(text)
-			.then(() => {
-				toast.success("클립보드에 복사되었습니다");
-			})
-			.catch(() => {
-				toast.error("복사 실패");
-			});
-	};
-
 	// Format currency
 	const formatCurrency = (amount: number) => {
 		return new Intl.NumberFormat("ko-KR", {
@@ -99,6 +90,9 @@ export default function TeamDetailPage() {
 			currency: "USD",
 		}).format(amount);
 	};
+
+	const hasActiveAdminKeys = adminKeys?.some((k) => k.isActive) ?? false;
+	const activeAdminKeysCount = adminKeys?.filter((k) => k.isActive).length ?? 0;
 
 	if (isLoading) {
 		return (
@@ -124,81 +118,243 @@ export default function TeamDetailPage() {
 
 	return (
 		<div className="space-y-6">
-			{/* Header */}
-			<div>
-				<h2 className="font-bold text-2xl text-foreground">{team.name}</h2>
-				<p className="mt-2 text-muted-foreground text-sm">
-					팀 정보 및 API 키 관리
-				</p>
+			{/* Header with Actions */}
+			<div className="flex items-center justify-between">
+				<div>
+					<h2 className="font-bold text-3xl tracking-tight">{team.name}</h2>
+					<p className="mt-2 text-muted-foreground">
+						팀 정보, 멤버, 프로젝트 및 API 키 관리
+					</p>
+				</div>
+				<Link href={`/teams/${teamId}/settings`}>
+					<Button variant="outline" size="sm">
+						<Settings className="mr-2 h-4 w-4" />
+						Team Settings
+					</Button>
+				</Link>
 			</div>
 
-			{/* Team Info Card */}
+			{/* Quick Status Cards */}
+			<div className="grid gap-4 md:grid-cols-3">
+				<Card>
+					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+						<CardTitle className="font-medium text-sm">팀 멤버</CardTitle>
+						<Users className="h-4 w-4 text-muted-foreground" />
+					</CardHeader>
+					<CardContent>
+						<div className="font-bold text-2xl">{team.members.length}</div>
+						<p className="text-muted-foreground text-xs">
+							{team.members.filter((m) => m.role === "owner").length} 소유자,{" "}
+							{team.members.filter((m) => m.role === "admin").length} 관리자
+						</p>
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+						<CardTitle className="font-medium text-sm">프로젝트</CardTitle>
+						<Folder className="h-4 w-4 text-muted-foreground" />
+					</CardHeader>
+					<CardContent>
+						<div className="font-bold text-2xl">{team.projects.length}</div>
+						<p className="text-muted-foreground text-xs">
+							{
+								team.projects.filter((p) => p.apiKeyCount && p.apiKeyCount > 0)
+									.length
+							}{" "}
+							with API keys
+						</p>
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+						<CardTitle className="font-medium text-sm">
+							Admin API Keys
+						</CardTitle>
+						<Key className="h-4 w-4 text-muted-foreground" />
+					</CardHeader>
+					<CardContent>
+						<div className="font-bold text-2xl">
+							{hasActiveAdminKeys ? activeAdminKeysCount : 0}
+						</div>
+						<p className="text-muted-foreground text-xs">
+							{hasActiveAdminKeys ? (
+								<span className="text-success">Active</span>
+							) : (
+								<span className="text-warning">Setup required</span>
+							)}
+						</p>
+					</CardContent>
+				</Card>
+			</div>
+
+			{/* Team Members Card */}
 			<Card>
 				<CardHeader>
-					<CardTitle className="flex items-center gap-2">
-						<Users className="h-5 w-5" />팀 정보
-					</CardTitle>
+					<div className="flex items-center justify-between">
+						<CardTitle className="flex items-center gap-2">
+							<Users className="h-5 w-5" />팀 멤버
+						</CardTitle>
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => setInviteMemberDialogOpen(true)}
+						>
+							<Plus className="mr-2 h-4 w-4" />
+							멤버 초대
+						</Button>
+					</div>
 				</CardHeader>
 				<CardContent>
-					<div className="grid gap-4 sm:grid-cols-2">
-						<div>
-							<Label className="text-muted-foreground text-sm">팀명</Label>
-							<p className="mt-1 font-medium">{team.name}</p>
+					{team.budget && (
+						<div className="mb-4">
+							<Label className="text-muted-foreground text-sm">월 예산</Label>
+							<p className="mt-1 font-medium">{formatCurrency(team.budget)}</p>
 						</div>
-						{team.budget && (
-							<div>
-								<Label className="text-muted-foreground text-sm">월 예산</Label>
-								<p className="mt-1 font-medium">
-									{formatCurrency(team.budget)}
-								</p>
-							</div>
-						)}
-						<div>
-							<Label className="text-muted-foreground text-sm">멤버 수</Label>
-							<p className="mt-1 font-medium">{team.members.length}명</p>
-						</div>
-					</div>
+					)}
 
 					<Separator className="my-4" />
 
-					{/* Team Members */}
-					<div>
-						<div className="mb-3 flex items-center justify-between">
-							<h3 className="font-semibold">팀 멤버</h3>
-							<Button
-								size="sm"
-								variant="outline"
-								onClick={() => setInviteMemberDialogOpen(true)}
+					<div className="space-y-2">
+						{team.members.map((member) => (
+							<div
+								key={member.id}
+								className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50"
 							>
-								<Plus className="mr-2 h-4 w-4" />
-								멤버 초대
-							</Button>
-						</div>
-						<div className="space-y-2">
-							{team.members.map((member) => (
-								<div
-									key={member.id}
-									className="flex items-center justify-between rounded-lg border p-3"
-								>
-									<div>
-										<p className="font-medium">
-											{member.user.name || member.user.email}
-										</p>
-										<p className="text-muted-foreground text-sm">
-											{member.user.email}
-										</p>
-									</div>
-									<span className="rounded-full bg-primary/10 px-3 py-1 font-medium text-primary text-xs">
-										{member.role === "owner"
-											? "소유자"
-											: member.role === "admin"
-												? "관리자"
-												: "멤버"}
-									</span>
+								<div>
+									<p className="font-medium">
+										{member.user.name || member.user.email}
+									</p>
+									<p className="text-muted-foreground text-sm">
+										{member.user.email}
+									</p>
 								</div>
+								<Badge variant="secondary">
+									{member.role === "owner"
+										? "소유자"
+										: member.role === "admin"
+											? "관리자"
+											: "멤버"}
+								</Badge>
+							</div>
+						))}
+					</div>
+				</CardContent>
+			</Card>
+
+			{/* Projects Card */}
+			<Card>
+				<CardHeader>
+					<div className="flex items-center justify-between">
+						<CardTitle className="flex items-center gap-2">
+							<Folder className="h-5 w-5" />
+							프로젝트
+						</CardTitle>
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => router.push("/projects")}
+						>
+							<Plus className="mr-2 h-4 w-4" />
+							프로젝트 생성
+						</Button>
+					</div>
+				</CardHeader>
+				<CardContent>
+					{team.projects.length === 0 ? (
+						<p className="text-center text-muted-foreground text-sm">
+							아직 프로젝트가 없습니다. 프로젝트를 생성하여 비용 추적을
+							시작하세요.
+						</p>
+					) : (
+						<div className="space-y-2">
+							{team.projects.map((project) => (
+								<Link
+									key={project.id}
+									href={`/projects/${project.id}`}
+									className="block"
+								>
+									<div className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50">
+										<div>
+											<p className="font-medium">{project.name}</p>
+											{project.description && (
+												<p className="text-muted-foreground text-sm">
+													{project.description}
+												</p>
+											)}
+										</div>
+										<div className="flex items-center gap-2 text-muted-foreground text-xs">
+											<span>{project.memberCount} 멤버</span>
+											<span>•</span>
+											<span>{project.apiKeyCount ?? 0} API 키</span>
+										</div>
+									</div>
+								</Link>
 							))}
 						</div>
-					</div>
+					)}
+				</CardContent>
+			</Card>
+
+			{/* Admin Keys Status Card */}
+			<Card>
+				<CardHeader>
+					<CardTitle className="flex items-center gap-2">
+						<Key className="h-5 w-5" />
+						Admin API Keys
+					</CardTitle>
+				</CardHeader>
+				<CardContent>
+					{hasActiveAdminKeys ? (
+						<div className="space-y-2">
+							<p className="text-sm">
+								이 팀에는 {activeAdminKeysCount}개의 활성화된 Admin API Key가
+								등록되어 있습니다.
+							</p>
+							<div className="space-y-1">
+								{adminKeys
+									?.filter((k) => k.isActive)
+									.map((key) => (
+										<div
+											key={`${key.provider}-${key.organizationId}`}
+											className="flex items-center justify-between rounded-lg border p-2"
+										>
+											<div>
+												<p className="font-medium text-sm">
+													{key.displayName ??
+														`${key.provider} - ${key.organizationId}`}
+												</p>
+												<p className="text-muted-foreground text-xs">
+													Last 4: •••• {key.last4}
+												</p>
+											</div>
+											<Badge variant="secondary" className="text-xs">
+												{key.provider.toUpperCase()}
+											</Badge>
+										</div>
+									))}
+							</div>
+							<Link href={`/teams/${teamId}/settings`}>
+								<Button variant="outline" size="sm" className="mt-2 w-full">
+									키 관리하기
+								</Button>
+							</Link>
+						</div>
+					) : (
+						<div className="space-y-3">
+							<p className="text-muted-foreground text-sm">
+								Admin API Key를 등록하여 팀의 모든 프로젝트에서 AI 제공자의 비용
+								데이터를 추적하세요.
+							</p>
+							<Link href={`/teams/${teamId}/settings`}>
+								<Button variant="default" size="sm" className="w-full">
+									<Key className="mr-2 h-4 w-4" />
+									Admin API Key 등록하기
+								</Button>
+							</Link>
+						</div>
+					)}
 				</CardContent>
 			</Card>
 

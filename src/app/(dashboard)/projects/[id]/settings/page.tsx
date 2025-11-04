@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -18,8 +19,16 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Cloud, Trash2 } from "lucide-react";
-import { useParams } from "next/navigation";
+import {
+	AlertCircle,
+	Bell,
+	BookOpen,
+	Cloud,
+	Settings2,
+	Trash2,
+} from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AIProviderDisplay } from "~/app/_components/ai-provider/AIProviderDisplay";
@@ -28,6 +37,7 @@ import { api } from "~/trpc/react";
 
 export default function ProjectSettingsPage() {
 	const params = useParams();
+	const router = useRouter();
 	const projectId = params.id as string;
 
 	// Form state
@@ -134,14 +144,66 @@ export default function ProjectSettingsPage() {
 				)?.displayName ?? undefined)
 			: undefined;
 
+	const hasAnyAdminKeys = adminKeys && adminKeys.length > 0;
+	const isProviderLinked =
+		project?.aiProvider && project?.aiOrganizationId && project?.aiProjectId;
+
 	return (
-		<div className="space-y-6" data-testid="project-settings-page">
+		<div className="space-y-8 p-6" data-testid="project-settings-page">
+			{/* Header */}
 			<div>
-				<h2 className="font-bold text-2xl text-foreground">프로젝트 설정</h2>
-				<p className="mt-2 text-muted-foreground text-sm">
+				<h2 className="font-bold text-3xl tracking-tight">프로젝트 설정</h2>
+				<p className="mt-2 text-muted-foreground">
 					AI 제공자 연결 및 비용 임계값 알림을 설정하고 관리합니다
 				</p>
 			</div>
+
+			{/* Setup Progress Banner */}
+			{!hasAnyAdminKeys && (
+				<Alert variant="default" className="border-amber-200 bg-amber-50">
+					<AlertCircle className="h-4 w-4 text-amber-600" />
+					<AlertDescription>
+						<div className="flex items-center justify-between">
+							<div>
+								<p className="font-medium text-amber-900 text-sm">
+									Setup Required: Team Admin API Key
+								</p>
+								<p className="text-amber-700 text-xs">
+									Before linking this project to an AI provider, your team needs
+									to register an Admin API Key in Team Settings.
+								</p>
+							</div>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									router.push(`/teams/${project?.teamId}/settings`);
+								}}
+								className="border-amber-300 hover:bg-amber-100"
+							>
+								Go to Team Settings
+							</Button>
+						</div>
+					</AlertDescription>
+				</Alert>
+			)}
+
+			{hasAnyAdminKeys && !isProviderLinked && (
+				<Alert variant="default" className="border-info bg-info/10">
+					<Settings2 className="h-4 w-4 text-info" />
+					<AlertDescription>
+						<div>
+							<p className="font-medium text-foreground text-sm">
+								Next Step: Link AI Provider
+							</p>
+							<p className="text-muted-foreground text-xs">
+								Your team has registered Admin API Keys. Now link this project
+								to an AI Provider Project ID to start tracking costs.
+							</p>
+						</div>
+					</AlertDescription>
+				</Alert>
+			)}
 
 			<Separator />
 
@@ -179,6 +241,81 @@ export default function ProjectSettingsPage() {
 					)}
 				</CardContent>
 			</Card>
+
+			{/* Setup Guide */}
+			{!isProviderLinked && hasAnyAdminKeys && (
+				<Card>
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2 text-base">
+							<BookOpen className="h-5 w-5 text-info" />
+							Setup Guide: Register AI Project ID
+						</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-4 text-sm">
+						<div className="space-y-2">
+							<h4 className="font-semibold">Step 1: Find Your AI Project ID</h4>
+							<p className="text-muted-foreground">
+								Go to your AI provider's dashboard and locate your Project ID:
+							</p>
+							<ul className="ml-6 list-disc space-y-1 text-muted-foreground">
+								<li>
+									<strong>OpenAI:</strong>{" "}
+									<Link
+										href="https://platform.openai.com/settings/organization/projects"
+										target="_blank"
+										rel="noopener noreferrer"
+										className="text-primary hover:underline"
+									>
+										Projects Settings
+									</Link>{" "}
+									→ Select project → Copy Project ID (starts with proj_...)
+								</li>
+								<li>
+									<strong>Anthropic:</strong> Console → Projects → Project
+									Settings
+								</li>
+								<li>
+									<strong>AWS:</strong> Account ID or Resource ARN
+								</li>
+								<li>
+									<strong>Azure:</strong> Subscription ID or Resource Group ID
+								</li>
+							</ul>
+						</div>
+
+						<div className="space-y-2">
+							<h4 className="font-semibold">
+								Step 2: Select Provider and Organization
+							</h4>
+							<p className="text-muted-foreground">
+								Use the form above to select the AI provider and organization
+								that your team has already registered Admin API Keys for.
+							</p>
+						</div>
+
+						<div className="space-y-2">
+							<h4 className="font-semibold">
+								Step 3: Enter and Validate Project ID
+							</h4>
+							<p className="text-muted-foreground">
+								Paste your AI Project ID. The system will automatically validate
+								it in real-time using your team's Admin API Key. Once validated,
+								click "Register Provider" to complete the setup.
+							</p>
+						</div>
+
+						<Alert>
+							<AlertCircle className="h-4 w-4" />
+							<AlertDescription className="text-xs">
+								<strong>Important:</strong> The Project ID must be accessible
+								via your team's Admin API Key. If validation fails, verify that
+								the Project ID exists in your provider account and that your
+								Admin API Key has the correct permissions.
+							</AlertDescription>
+						</Alert>
+					</CardContent>
+				</Card>
+			)}
 
 			<Separator />
 
@@ -317,6 +454,18 @@ export default function ProjectSettingsPage() {
 					</ul>
 				</CardContent>
 			</Card>
+
+			{/* Architecture Context */}
+			<Alert>
+				<AlertCircle className="h-4 w-4" />
+				<AlertDescription className="text-xs">
+					<strong>Cost Attribution Model:</strong> This project's costs are
+					tracked via your team's Admin API Key using the Costs API. All costs
+					for the linked AI Project ID are automatically attributed to this
+					project. For detailed cost data, ensure your AI provider's project
+					configuration matches this project's scope.
+				</AlertDescription>
+			</Alert>
 		</div>
 	);
 }
