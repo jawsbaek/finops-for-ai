@@ -668,10 +668,8 @@ export const projectRouter = createTRPCRouter({
 			}
 			const userId = session.user.id;
 
-			// Ensure user has access to project
-			await ensureProjectAccess(userId, input.projectId);
-
-			// Get all members
+			// Performance optimization: Single query instead of N+1
+			// Fetch all members and do permission check in-memory
 			const members = await db.projectMember.findMany({
 				where: {
 					projectId: input.projectId,
@@ -684,13 +682,57 @@ export const projectRouter = createTRPCRouter({
 							name: true,
 						},
 					},
+					project: {
+						select: {
+							id: true,
+							teamId: true,
+							team: {
+								select: {
+									members: {
+										where: {
+											userId,
+											role: { in: ["owner", "admin"] },
+										},
+										select: {
+											id: true,
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 				orderBy: {
 					createdAt: "asc",
 				},
 			});
 
-			return members;
+			if (members.length === 0) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Project not found",
+				});
+			}
+
+			// In-memory permission check (avoids separate ensureProjectAccess query)
+			const isProjectMember = members.some((m) => m.userId === userId);
+			const isTeamAdmin = (members[0]?.project.team.members.length ?? 0) > 0;
+
+			if (!isProjectMember && !isTeamAdmin) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You do not have access to this project",
+				});
+			}
+
+			// Return only the member data (exclude project metadata)
+			return members.map((m) => ({
+				id: m.id,
+				userId: m.userId,
+				projectId: m.projectId,
+				createdAt: m.createdAt,
+				user: m.user,
+			}));
 		}),
 
 	/**
