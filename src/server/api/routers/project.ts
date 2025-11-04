@@ -23,7 +23,7 @@ import { extractLast4 } from "~/lib/api-key-utils";
 import { logger } from "~/lib/logger";
 import { sanitizeInput } from "~/lib/sanitize";
 import {
-	generateEncryptedApiKey,
+	encryptApiKey,
 	validateApiKey,
 } from "~/lib/services/encryption/api-key-manager";
 import {
@@ -688,8 +688,12 @@ export const projectRouter = createTRPCRouter({
 		}),
 
 	/**
-	 * Generate and store an encrypted API key for the project
+	 * Register and store an encrypted API key for the project
 	 * Project member or Team admin can add API keys
+	 *
+	 * Note: Despite the name "generate", this endpoint registers an existing API key
+	 * (provided by the user) rather than generating a new one. The name is kept for
+	 * backward compatibility with existing client code.
 	 *
 	 * Security: Rate limited to 10 requests/min, stores only last4 chars for display
 	 */
@@ -724,7 +728,7 @@ export const projectRouter = createTRPCRouter({
 			const last4 = extractLast4(input.apiKey);
 
 			// Encrypt the API key using KMS envelope encryption
-			const encrypted = await generateEncryptedApiKey(input.apiKey);
+			const encrypted = await encryptApiKey(input.apiKey);
 
 			// Store encrypted key in database
 			const apiKey = await db.apiKey.create({
