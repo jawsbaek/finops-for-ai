@@ -796,63 +796,86 @@ export const teamRouter = createTRPCRouter({
 				organizationId = await fetchOpenAIOrganizationId(input.apiKey);
 			}
 
-			// 4. Check for duplicate (same team + provider + org)
-			const existing = await ctx.db.organizationApiKey.findUnique({
-				where: {
-					unique_team_provider_org: {
-						teamId: input.teamId,
-						provider: input.provider,
-						organizationId: organizationId ?? (null as unknown as string),
-					},
-				},
-			});
-
-			if (existing) {
-				throw new TRPCError({
-					code: "CONFLICT",
-					message: `An API key for ${input.provider}${organizationId ? ` (${organizationId})` : ""} already exists`,
-				});
-			}
-
-			// 5. Encrypt API key with KMS
+			// 4. Encrypt API key with KMS (before transaction to reduce lock time)
 			const { ciphertext, encryptedDataKey, iv } = await encryptApiKey(
 				input.apiKey,
 			);
 			const last4 = input.apiKey.slice(-4);
 
-			// 6. Store Admin Key
-			const adminKey = await ctx.db.organizationApiKey.create({
-				data: {
-					teamId: input.teamId,
-					provider: input.provider,
-					organizationId,
-					encryptedKey: ciphertext,
-					encryptedDataKey,
-					iv,
-					last4,
-					isActive: true,
-					keyType: "admin",
-					displayName:
-						input.displayName ??
-						`${input.provider}${organizationId ? ` - ${organizationId}` : ""}`,
-				},
-			});
+			// 5. Store Admin Key with race condition protection
+			let adminKey: Awaited<
+				ReturnType<typeof ctx.db.organizationApiKey.create>
+			>;
+			try {
+				adminKey = await ctx.db.$transaction(async (tx) => {
+					// Check for duplicate with transaction isolation
+					const existing = await tx.organizationApiKey.findUnique({
+						where: {
+							unique_team_provider_org: {
+								teamId: input.teamId,
+								provider: input.provider,
+								organizationId: organizationId ?? (null as unknown as string),
+							},
+						},
+					});
 
-			// 7. Audit log
-			await ctx.db.auditLog.create({
-				data: {
-					userId,
-					actionType: "admin_api_key_registered",
-					resourceType: "organization_api_key",
-					resourceId: adminKey.id,
-					metadata: {
-						teamId: input.teamId,
-						provider: input.provider,
-						organizationId,
-						last4,
-					},
-				},
-			});
+					if (existing) {
+						throw new TRPCError({
+							code: "CONFLICT",
+							message: `An API key for ${input.provider}${organizationId ? ` (${organizationId})` : ""} already exists`,
+						});
+					}
+
+					// Create admin key within transaction
+					const key = await tx.organizationApiKey.create({
+						data: {
+							teamId: input.teamId,
+							provider: input.provider,
+							organizationId,
+							encryptedKey: ciphertext,
+							encryptedDataKey,
+							iv,
+							last4,
+							isActive: true,
+							keyType: "admin",
+							displayName:
+								input.displayName ??
+								`${input.provider}${organizationId ? ` - ${organizationId}` : ""}`,
+						},
+					});
+
+					// Audit log within same transaction
+					await tx.auditLog.create({
+						data: {
+							userId,
+							actionType: "admin_api_key_registered",
+							resourceType: "organization_api_key",
+							resourceId: key.id,
+							metadata: {
+								teamId: input.teamId,
+								provider: input.provider,
+								organizationId,
+								last4,
+							},
+						},
+					});
+
+					return key;
+				});
+			} catch (error) {
+				// Handle Prisma unique constraint violations from race conditions
+				if (
+					error instanceof Error &&
+					"code" in error &&
+					error.code === "P2002"
+				) {
+					throw new TRPCError({
+						code: "CONFLICT",
+						message: `An API key for ${input.provider}${organizationId ? ` (${organizationId})` : ""} already exists`,
+					});
+				}
+				throw error;
+			}
 
 			logger.info(
 				{

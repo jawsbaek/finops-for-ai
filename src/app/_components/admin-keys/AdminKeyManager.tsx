@@ -4,12 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Key } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
 import { api } from "~/trpc/react";
 import { AdminKeyList } from "./AdminKeyList";
 import {
 	type AdminKeyFormData,
 	AdminKeyRegistrationForm,
 } from "./AdminKeyRegistrationForm";
+
+// Provider schema for runtime validation
+const ProviderSchema = z.enum(["openai", "anthropic", "aws", "azure"]);
 
 interface AdminKeyManagerProps {
 	teamId: string;
@@ -85,18 +89,32 @@ export function AdminKeyManager({ teamId }: AdminKeyManagerProps) {
 		);
 		if (!key) return;
 
+		// Validate provider with runtime check
+		const validatedProvider = ProviderSchema.safeParse(provider);
+		if (!validatedProvider.success) {
+			toast.error("Invalid provider type");
+			return;
+		}
+
 		toggleMutation.mutate({
 			teamId,
-			provider: provider as "openai" | "anthropic" | "aws" | "azure",
+			provider: validatedProvider.data,
 			organizationId: orgId,
 			isActive: !key.isActive,
 		});
 	};
 
 	const handleDelete = (provider: string, orgId: string) => {
+		// Validate provider with runtime check
+		const validatedProvider = ProviderSchema.safeParse(provider);
+		if (!validatedProvider.success) {
+			toast.error("Invalid provider type");
+			return;
+		}
+
 		deleteMutation.mutate({
 			teamId,
-			provider: provider as "openai" | "anthropic" | "aws" | "azure",
+			provider: validatedProvider.data,
 			organizationId: orgId,
 		});
 	};

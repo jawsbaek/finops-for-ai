@@ -306,10 +306,27 @@ export async function collectDailyCostsV2(
 
 			// Create mapping: AI Project ID → Internal Project ID
 			// Support both new aiProjectId and legacy openaiProjectId
+			const validProjects = projects.filter(
+				(p) => p.aiProjectId != null || p.openaiProjectId != null,
+			);
+
+			if (validProjects.length === 0) {
+				logger.warn(
+					{
+						teamId,
+						organizationId: orgApiKey.organizationId,
+						totalProjects: projects.length,
+					},
+					"No projects with valid AI Project IDs found, skipping organization",
+				);
+				continue;
+			}
+
 			const projectIdMap = new Map(
-				projects
-					.filter((p) => p.aiProjectId != null || p.openaiProjectId != null)
-					.map((p) => [(p.aiProjectId ?? p.openaiProjectId) as string, p.id]),
+				validProjects.map((p) => [
+					(p.aiProjectId ?? p.openaiProjectId) as string,
+					p.id,
+				]),
 			);
 			const aiProjectIds = Array.from(projectIdMap.keys());
 
@@ -317,7 +334,8 @@ export async function collectDailyCostsV2(
 				{
 					teamId,
 					organizationId: orgApiKey.organizationId,
-					projectCount: projects.length,
+					projectCount: validProjects.length,
+					totalProjects: projects.length,
 				},
 				"Fetching costs for organization",
 			);

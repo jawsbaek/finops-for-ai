@@ -1,5 +1,27 @@
 import { TRPCError } from "@trpc/server";
+import pino from "pino";
 import type { ValidationResult } from "./validation";
+
+const logger = pino({ name: "openai-validator" });
+
+// Simple in-memory cache for validation results (5 minutes TTL)
+const validationCache = new Map<
+	string,
+	{ valid: boolean; error?: string; timestamp: number }
+>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Clean expired cache entries
+ */
+function cleanExpiredCache() {
+	const now = Date.now();
+	for (const [key, value] of validationCache.entries()) {
+		if (now - value.timestamp > CACHE_TTL_MS) {
+			validationCache.delete(key);
+		}
+	}
+}
 
 /**
  * Fetch OpenAI organization ID from API
@@ -21,9 +43,16 @@ export async function fetchOpenAIOrganizationId(
 		});
 
 		if (!response.ok) {
+			const errorText = await response.text();
+			logger.error(
+				{ status: response.status, error: errorText },
+				"Failed to fetch organization from OpenAI API",
+			);
+
 			throw new TRPCError({
 				code: "BAD_REQUEST",
-				message: "Failed to fetch organization from OpenAI API",
+				message:
+					"Unable to fetch organization. Please verify your API key is valid.",
 			});
 		}
 
@@ -58,6 +87,8 @@ export async function fetchOpenAIOrganizationId(
 /**
  * Validate OpenAI project ID via API (Option A: project-scoped)
  *
+ * Includes caching to prevent excessive API calls (5 minute TTL)
+ *
  * @param adminApiKey - Decrypted OpenAI Admin API key
  * @param projectId - OpenAI project ID (e.g., "proj_xyz")
  * @returns Validation result with error message if invalid
@@ -66,6 +97,16 @@ export async function validateOpenAIProjectId(
 	adminApiKey: string,
 	projectId: string,
 ): Promise<ValidationResult> {
+	// Check cache first
+	cleanExpiredCache();
+	const cacheKey = `${projectId}-${adminApiKey.slice(-4)}`;
+	const cached = validationCache.get(cacheKey);
+
+	if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+		logger.debug({ projectId }, "Validation cache hit");
+		return { valid: cached.valid, error: cached.error };
+	}
+
 	try {
 		const response = await fetch(
 			`https://api.openai.com/v1/organization/projects/${projectId}/api_keys?limit=1`,
@@ -78,27 +119,44 @@ export async function validateOpenAIProjectId(
 			},
 		);
 
-		if (response.ok) {
-			return { valid: true };
-		}
+		let result: ValidationResult;
 
-		if (response.status === 404) {
-			return {
+		if (response.ok) {
+			result = { valid: true };
+		} else if (response.status === 404) {
+			result = {
 				valid: false,
 				error: "Project ID not found in your organization",
 			};
-		}
-
-		if (response.status === 403) {
-			return {
+		} else if (response.status === 403) {
+			result = {
 				valid: false,
 				error: "Admin API Key does not have access to this project",
 			};
+		} else {
+			// Other errors (429, 500, etc.) - sanitize for security
+			const errorText = await response.text();
+			logger.error(
+				{ status: response.status, error: errorText },
+				"OpenAI API validation failed",
+			);
+
+			// Return generic error message to prevent information leakage
+			result = {
+				valid: false,
+				error:
+					"Unable to validate project ID. Please check your API key permissions and try again.",
+			};
 		}
 
-		// Other errors (429, 500, etc.)
-		const errorText = await response.text();
-		throw new Error(`OpenAI API error (${response.status}): ${errorText}`);
+		// Cache the result
+		validationCache.set(cacheKey, {
+			valid: result.valid,
+			error: result.error,
+			timestamp: Date.now(),
+		});
+
+		return result;
 	} catch (error) {
 		if (
 			error instanceof Error &&
