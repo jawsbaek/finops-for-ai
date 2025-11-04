@@ -81,6 +81,7 @@ export function AIProviderRegistration({
 	// Real-time validation via API
 	const validateMutation = api.project.validateAIProjectId.useMutation();
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: validateMutation is stable and should not trigger re-validation
 	useEffect(() => {
 		if (!projectIdInput.trim() || !selectedProvider || !selectedOrg) {
 			setValidationStatus("idle");
@@ -121,13 +122,7 @@ export function AIProviderRegistration({
 		}, 500);
 
 		return () => clearTimeout(timer);
-	}, [
-		projectIdInput,
-		selectedProvider,
-		selectedOrg,
-		projectId,
-		validateMutation,
-	]);
+	}, [projectIdInput, selectedProvider, selectedOrg, projectId]);
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
