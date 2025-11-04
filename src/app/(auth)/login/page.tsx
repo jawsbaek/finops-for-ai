@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -47,15 +48,23 @@ export default function LoginPage() {
 
 			if (response?.error) {
 				setErrors({ general: "Invalid email or password" });
+				toast.error("로그인 실패", {
+					description: "Invalid email or password",
+				});
 				setIsLoading(false);
 				return;
 			}
 
 			// Redirect to dashboard on success
+			// Note: isLoading remains true during navigation to prevent duplicate clicks
+			toast.success("로그인 성공!");
 			router.push("/dashboard");
 		} catch (error) {
 			console.error("Login error:", error);
 			setErrors({ general: "An unexpected error occurred" });
+			toast.error("로그인 실패", {
+				description: "An unexpected error occurred",
+			});
 			setIsLoading(false);
 		}
 	};

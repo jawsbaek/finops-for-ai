@@ -487,6 +487,7 @@ export default function ProjectDetailPage() {
 						</div>
 					</div>
 					<Button
+						data-testid="add-api-key-button"
 						onClick={() => setAddApiKeyDialogOpen(true)}
 						disabled={generateApiKey.isPending}
 					>

@@ -94,7 +94,7 @@ export default function TeamsPage() {
 				{/* Create Team Button */}
 				<Dialog open={open} onOpenChange={setOpen}>
 					<DialogTrigger asChild>
-						<Button>
+						<Button data-testid="create-team-button">
 							<Plus className="mr-2 h-4 w-4" />새 팀 생성
 						</Button>
 					</DialogTrigger>
@@ -149,6 +149,7 @@ export default function TeamsPage() {
 								취소
 							</Button>
 							<Button
+								data-testid="confirm-create-team"
 								onClick={handleCreateTeam}
 								disabled={createTeam.isPending || !name.trim()}
 							>
