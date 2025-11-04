@@ -30,8 +30,8 @@ export async function fetchOpenAIOrganizationId(
 		const data = (await response.json()) as { data: Array<{ id: string }> };
 
 		// Return first organization (user might belong to multiple)
-		if (data.data && data.data.length > 0) {
-			return data.data[0]?.id;
+		if (data.data && data.data.length > 0 && data.data[0]?.id) {
+			return data.data[0].id;
 		}
 
 		throw new TRPCError({

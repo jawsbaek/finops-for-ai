@@ -50,7 +50,9 @@ export default function TeamSettingsPage() {
 			return;
 		}
 
-		registerMutation.mutate({ teamId, apiKey });
+		// Default to OpenAI for backward compatibility
+		// TODO: Add provider selector in UI (Phase 4)
+		registerMutation.mutate({ teamId, apiKey, provider: "openai" });
 	};
 
 	return (
