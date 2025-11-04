@@ -15,6 +15,7 @@
 import type { TeamMember } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { ERROR_MESSAGES } from "~/lib/error-messages";
 import { logger } from "~/lib/logger";
 import {
 	encryptApiKey,
@@ -38,14 +39,14 @@ function requireAdminRole(
 	if (!teamMember) {
 		throw new TRPCError({
 			code: "FORBIDDEN",
-			message: "You are not a member of this team",
+			message: ERROR_MESSAGES.TEAM_ACCESS_DENIED,
 		});
 	}
 
 	if (teamMember.role !== "owner" && teamMember.role !== "admin") {
 		throw new TRPCError({
 			code: "FORBIDDEN",
-			message: `Only team owners and admins can ${operation}`,
+			message: ERROR_MESSAGES.TEAM_ADMIN_REQUIRED,
 		});
 	}
 }
@@ -199,7 +200,7 @@ export const teamRouter = createTRPCRouter({
 			if (!membership) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this team",
+					message: ERROR_MESSAGES.TEAM_ACCESS_DENIED,
 				});
 			}
 
@@ -244,7 +245,7 @@ export const teamRouter = createTRPCRouter({
 			if (!team) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "Team not found",
+					message: ERROR_MESSAGES.TEAM_NOT_FOUND,
 				});
 			}
 
@@ -301,7 +302,7 @@ export const teamRouter = createTRPCRouter({
 			if (!membership) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this team",
+					message: ERROR_MESSAGES.TEAM_ACCESS_DENIED,
 				});
 			}
 
@@ -372,7 +373,7 @@ export const teamRouter = createTRPCRouter({
 				) {
 					throw new TRPCError({
 						code: "FORBIDDEN",
-						message: "Only team owners can update team information",
+						message: ERROR_MESSAGES.TEAM_OWNER_REQUIRED,
 					});
 				}
 
@@ -385,7 +386,7 @@ export const teamRouter = createTRPCRouter({
 				if (!currentTeam) {
 					throw new TRPCError({
 						code: "NOT_FOUND",
-						message: "Team not found",
+						message: ERROR_MESSAGES.TEAM_NOT_FOUND,
 					});
 				}
 
@@ -402,7 +403,7 @@ export const teamRouter = createTRPCRouter({
 					if (!newOwner) {
 						throw new TRPCError({
 							code: "BAD_REQUEST",
-							message: "New owner user does not exist",
+							message: ERROR_MESSAGES.TEAM_NEW_OWNER_NOT_EXIST,
 						});
 					}
 				}
@@ -540,7 +541,7 @@ export const teamRouter = createTRPCRouter({
 			) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "Only team owners and admins can add members",
+					message: ERROR_MESSAGES.TEAM_ADMIN_REQUIRED,
 				});
 			}
 
@@ -569,7 +570,7 @@ export const teamRouter = createTRPCRouter({
 			if (existingMembership) {
 				throw new TRPCError({
 					code: "CONFLICT",
-					message: "이미 팀 멤버입니다",
+					message: ERROR_MESSAGES.TEAM_MEMBER_ALREADY_EXISTS,
 				});
 			}
 
@@ -633,7 +634,7 @@ export const teamRouter = createTRPCRouter({
 			if (!requesterMembership || requesterMembership.role !== "owner") {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "Only team owners can remove members",
+					message: ERROR_MESSAGES.TEAM_ADMIN_REQUIRED,
 				});
 			}
 
@@ -641,7 +642,7 @@ export const teamRouter = createTRPCRouter({
 			if (input.userId === requesterId) {
 				throw new TRPCError({
 					code: "BAD_REQUEST",
-					message: "팀 소유자는 팀에서 나갈 수 없습니다",
+					message: ERROR_MESSAGES.TEAM_OWNER_CANNOT_LEAVE,
 				});
 			}
 
@@ -714,7 +715,7 @@ export const teamRouter = createTRPCRouter({
 			if (!requesterMembership || requesterMembership.role !== "owner") {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "Only team owners can change member roles",
+					message: ERROR_MESSAGES.TEAM_ADMIN_REQUIRED,
 				});
 			}
 
@@ -722,7 +723,7 @@ export const teamRouter = createTRPCRouter({
 			if (input.userId === requesterId) {
 				throw new TRPCError({
 					code: "BAD_REQUEST",
-					message: "자신의 역할은 변경할 수 없습니다",
+					message: ERROR_MESSAGES.TEAM_CANNOT_CHANGE_OWN_ROLE,
 				});
 			}
 
@@ -805,7 +806,7 @@ export const teamRouter = createTRPCRouter({
 			if (!teamMember || !["owner", "admin"].includes(teamMember.role)) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "Only team owners/admins can register Admin API keys",
+					message: ERROR_MESSAGES.ADMIN_KEY_REGISTER_PERMISSION_DENIED,
 				});
 			}
 
@@ -947,7 +948,7 @@ export const teamRouter = createTRPCRouter({
 			if (!teamMember) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You are not a member of this team",
+					message: ERROR_MESSAGES.TEAM_ACCESS_DENIED,
 				});
 			}
 
@@ -1012,7 +1013,7 @@ export const teamRouter = createTRPCRouter({
 			if (!adminKey) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "Admin key not found",
+					message: ERROR_MESSAGES.ADMIN_KEY_NOT_FOUND,
 				});
 			}
 
@@ -1096,7 +1097,7 @@ export const teamRouter = createTRPCRouter({
 			if (!adminKey) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "Admin key not found",
+					message: ERROR_MESSAGES.ADMIN_KEY_NOT_FOUND,
 				});
 			}
 

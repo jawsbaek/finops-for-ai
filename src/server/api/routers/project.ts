@@ -20,6 +20,7 @@ import { TRPCError } from "@trpc/server";
 import { subDays } from "date-fns";
 import { z } from "zod";
 import { extractLast4 } from "~/lib/api-key-utils";
+import { ERROR_MESSAGES } from "~/lib/error-messages";
 import { logger } from "~/lib/logger";
 import { sanitizeInput } from "~/lib/sanitize";
 import {
@@ -67,7 +68,7 @@ async function ensureProjectAccess(userId: string, projectId: string) {
 	if (!project) {
 		throw new TRPCError({
 			code: "NOT_FOUND",
-			message: "Project not found",
+			message: ERROR_MESSAGES.PROJECT_NOT_FOUND,
 		});
 	}
 
@@ -77,7 +78,7 @@ async function ensureProjectAccess(userId: string, projectId: string) {
 	if (!isProjectMember && !isTeamAdmin) {
 		throw new TRPCError({
 			code: "FORBIDDEN",
-			message: "You do not have access to this project",
+			message: ERROR_MESSAGES.PROJECT_ACCESS_DENIED,
 		});
 	}
 
@@ -107,14 +108,14 @@ async function ensureTeamAdmin(userId: string, projectId: string) {
 	if (!project) {
 		throw new TRPCError({
 			code: "NOT_FOUND",
-			message: "Project not found",
+			message: ERROR_MESSAGES.PROJECT_NOT_FOUND,
 		});
 	}
 
 	if (project.team.members.length === 0) {
 		throw new TRPCError({
 			code: "FORBIDDEN",
-			message: "Team admin access required",
+			message: ERROR_MESSAGES.PROJECT_TEAM_ADMIN_REQUIRED,
 		});
 	}
 
@@ -154,7 +155,7 @@ export const projectRouter = createTRPCRouter({
 			if (!hasAccess) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this team",
+					message: ERROR_MESSAGES.TEAM_ACCESS_DENIED,
 				});
 			}
 
@@ -373,7 +374,7 @@ export const projectRouter = createTRPCRouter({
 			if (!project) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "Project not found",
+					message: ERROR_MESSAGES.PROJECT_NOT_FOUND,
 				});
 			}
 
@@ -381,7 +382,7 @@ export const projectRouter = createTRPCRouter({
 			if (!teamIds.includes(project.teamId)) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this project",
+					message: ERROR_MESSAGES.PROJECT_ACCESS_DENIED,
 				});
 			}
 
@@ -476,14 +477,14 @@ export const projectRouter = createTRPCRouter({
 			if (!project) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "Project not found",
+					message: ERROR_MESSAGES.PROJECT_NOT_FOUND,
 				});
 			}
 
 			if (!teamIds.includes(project.teamId)) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this project",
+					message: ERROR_MESSAGES.PROJECT_ACCESS_DENIED,
 				});
 			}
 
@@ -538,7 +539,7 @@ export const projectRouter = createTRPCRouter({
 			if (!user) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "User not found",
+					message: ERROR_MESSAGES.PROJECT_USER_NOT_FOUND,
 				});
 			}
 
@@ -555,7 +556,7 @@ export const projectRouter = createTRPCRouter({
 			if (existingMember) {
 				throw new TRPCError({
 					code: "CONFLICT",
-					message: "User is already a member of this project",
+					message: ERROR_MESSAGES.PROJECT_MEMBER_ALREADY_EXISTS,
 				});
 			}
 
@@ -624,7 +625,7 @@ export const projectRouter = createTRPCRouter({
 			if (!member) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "User is not a member of this project",
+					message: ERROR_MESSAGES.PROJECT_MEMBER_NOT_FOUND,
 				});
 			}
 
@@ -817,7 +818,8 @@ export const projectRouter = createTRPCRouter({
 				apiKeyId: z.string(),
 				reason: z
 					.string()
-					.min(1, "Reason is required")
+					.min(1, ERROR_MESSAGES.API_KEY_DISABLE_REASON_REQUIRED)
+					.max(500, ERROR_MESSAGES.VALIDATION_REASON_TOO_LONG)
 					.transform(sanitizeInput),
 			}),
 		)
@@ -844,33 +846,33 @@ export const projectRouter = createTRPCRouter({
 			if (!apiKey) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "API key not found",
+					message: ERROR_MESSAGES.API_KEY_NOT_FOUND,
 				});
 			}
 
 			// Ensure user has access to the project
 			await ensureProjectAccess(userId, apiKey.project.id);
 
-			// Disable the API key
-			const updated = await db.apiKey.update({
-				where: { id: input.apiKeyId },
-				data: { isActive: false },
-			});
-
-			// Create audit log
-			await db.auditLog.create({
-				data: {
-					userId,
-					actionType: "api_key_disabled",
-					resourceType: "api_key",
-					resourceId: input.apiKeyId,
-					metadata: {
-						reason: input.reason,
-						projectId: apiKey.project.id,
-						provider: apiKey.provider,
+			// Use transaction to ensure atomicity: update and audit log must both succeed or both fail
+			const [updated] = await db.$transaction([
+				db.apiKey.update({
+					where: { id: input.apiKeyId },
+					data: { isActive: false },
+				}),
+				db.auditLog.create({
+					data: {
+						userId,
+						actionType: "api_key_disabled",
+						resourceType: "api_key",
+						resourceId: input.apiKeyId,
+						metadata: {
+							reason: input.reason,
+							projectId: apiKey.project.id,
+							provider: apiKey.provider,
+						},
 					},
-				},
-			});
+				}),
+			]);
 
 			logger.info(
 				{
@@ -897,6 +899,7 @@ export const projectRouter = createTRPCRouter({
 				apiKeyId: z.string(),
 				reason: z
 					.string()
+					.max(500, ERROR_MESSAGES.VALIDATION_REASON_TOO_LONG)
 					.optional()
 					.transform((val) => (val ? sanitizeInput(val) : val)),
 			}),
@@ -924,33 +927,33 @@ export const projectRouter = createTRPCRouter({
 			if (!apiKey) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "API key not found",
+					message: ERROR_MESSAGES.API_KEY_NOT_FOUND,
 				});
 			}
 
 			// Ensure user has access to the project
 			await ensureProjectAccess(userId, apiKey.project.id);
 
-			// Enable the API key
-			const updated = await db.apiKey.update({
-				where: { id: input.apiKeyId },
-				data: { isActive: true },
-			});
-
-			// Create audit log
-			await db.auditLog.create({
-				data: {
-					userId,
-					actionType: "api_key_enabled",
-					resourceType: "api_key",
-					resourceId: input.apiKeyId,
-					metadata: {
-						reason: input.reason || "Re-enabled API key",
-						projectId: apiKey.project.id,
-						provider: apiKey.provider,
+			// Use transaction to ensure atomicity: update and audit log must both succeed or both fail
+			const [updated] = await db.$transaction([
+				db.apiKey.update({
+					where: { id: input.apiKeyId },
+					data: { isActive: true },
+				}),
+				db.auditLog.create({
+					data: {
+						userId,
+						actionType: "api_key_enabled",
+						resourceType: "api_key",
+						resourceId: input.apiKeyId,
+						metadata: {
+							reason: input.reason || "Re-enabled API key",
+							projectId: apiKey.project.id,
+							provider: apiKey.provider,
+						},
 					},
-				},
-			});
+				}),
+			]);
 
 			logger.info(
 				{
@@ -978,7 +981,8 @@ export const projectRouter = createTRPCRouter({
 				apiKeyId: z.string(),
 				reason: z
 					.string()
-					.min(1, "Reason is required")
+					.min(1, ERROR_MESSAGES.API_KEY_DELETION_REASON_REQUIRED)
+					.max(500, ERROR_MESSAGES.VALIDATION_REASON_TOO_LONG)
 					.transform(sanitizeInput),
 			}),
 		)
@@ -1005,34 +1009,33 @@ export const projectRouter = createTRPCRouter({
 			if (!apiKey) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "API key not found",
+					message: ERROR_MESSAGES.API_KEY_NOT_FOUND,
 				});
 			}
 
 			// Ensure user has access to the project
 			await ensureProjectAccess(userId, apiKey.project.id);
 
-			// Create audit log before deletion
-			await db.auditLog.create({
-				data: {
-					userId,
-					actionType: "api_key_deleted",
-					resourceType: "api_key",
-					resourceId: input.apiKeyId,
-					metadata: {
-						reason: input.reason,
-						projectId: apiKey.project.id,
-						provider: apiKey.provider,
-						wasActive: apiKey.isActive,
+			// Use transaction to ensure atomicity: audit log and deletion must both succeed or both fail
+			await db.$transaction([
+				db.auditLog.create({
+					data: {
+						userId,
+						actionType: "api_key_deleted",
+						resourceType: "api_key",
+						resourceId: input.apiKeyId,
+						metadata: {
+							reason: input.reason,
+							projectId: apiKey.project.id,
+							provider: apiKey.provider,
+							wasActive: apiKey.isActive,
+						},
 					},
-				},
-			});
-
-			// Delete the API key (hard delete)
-			// CostData.apiKeyId is nullable, so historical cost data is preserved
-			await db.apiKey.delete({
-				where: { id: input.apiKeyId },
-			});
+				}),
+				db.apiKey.delete({
+					where: { id: input.apiKeyId },
+				}),
+			]);
 
 			logger.info(
 				{
@@ -1087,7 +1090,7 @@ export const projectRouter = createTRPCRouter({
 			if (!project) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "Project not found",
+					message: ERROR_MESSAGES.PROJECT_NOT_FOUND,
 				});
 			}
 
@@ -1097,7 +1100,7 @@ export const projectRouter = createTRPCRouter({
 			if (!isProjectMember && !isTeamAdmin) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this project",
+					message: ERROR_MESSAGES.PROJECT_ACCESS_DENIED,
 				});
 			}
 
@@ -1255,7 +1258,7 @@ export const projectRouter = createTRPCRouter({
 			if (!project) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "Project not found",
+					message: ERROR_MESSAGES.PROJECT_NOT_FOUND,
 				});
 			}
 
@@ -1265,7 +1268,7 @@ export const projectRouter = createTRPCRouter({
 			if (!isProjectMember && !isTeamAdmin) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this project",
+					message: ERROR_MESSAGES.PROJECT_ACCESS_DENIED,
 				});
 			}
 
@@ -1356,7 +1359,7 @@ export const projectRouter = createTRPCRouter({
 			if (!project) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
-					message: "Project not found",
+					message: ERROR_MESSAGES.PROJECT_NOT_FOUND,
 				});
 			}
 
@@ -1366,7 +1369,7 @@ export const projectRouter = createTRPCRouter({
 			if (!isProjectMember && !isTeamAdmin) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You do not have access to this project",
+					message: ERROR_MESSAGES.PROJECT_ACCESS_DENIED,
 				});
 			}
 

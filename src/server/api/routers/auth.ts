@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import bcrypt from "bcrypt";
 import { z } from "zod";
+import { ERROR_MESSAGES } from "~/lib/error-messages";
 import {
 	createTRPCRouter,
 	protectedProcedure,
@@ -29,7 +30,7 @@ export const authRouter = createTRPCRouter({
 			if (existingUser) {
 				throw new TRPCError({
 					code: "CONFLICT",
-					message: "User with this email already exists",
+					message: ERROR_MESSAGES.AUTH_USER_ALREADY_EXISTS,
 				});
 			}
 
@@ -97,7 +98,7 @@ export const authRouter = createTRPCRouter({
 			if (!user) {
 				throw new TRPCError({
 					code: "UNAUTHORIZED",
-					message: "Invalid email or password",
+					message: ERROR_MESSAGES.AUTH_INVALID_CREDENTIALS,
 				});
 			}
 
@@ -107,7 +108,7 @@ export const authRouter = createTRPCRouter({
 			if (!isValid) {
 				throw new TRPCError({
 					code: "UNAUTHORIZED",
-					message: "Invalid email or password",
+					message: ERROR_MESSAGES.AUTH_INVALID_CREDENTIALS,
 				});
 			}
 
@@ -146,7 +147,7 @@ export const authRouter = createTRPCRouter({
 		if (!user) {
 			throw new TRPCError({
 				code: "NOT_FOUND",
-				message: "User not found",
+				message: ERROR_MESSAGES.AUTH_USER_NOT_FOUND,
 			});
 		}
 
