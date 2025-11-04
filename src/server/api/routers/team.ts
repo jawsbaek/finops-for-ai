@@ -12,6 +12,7 @@
  * - updateMemberRole: Update a member's role
  */
 
+import type { TeamMember } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { logger } from "~/lib/logger";
@@ -22,6 +23,32 @@ import {
 import { fetchOpenAIOrganizationId } from "~/lib/services/providers/openai-validator";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { db } from "~/server/db";
+
+/**
+ * Helper function to verify that a user has admin or owner role for a team
+ *
+ * @param teamMember - The team member record to check
+ * @param operation - Description of the operation being performed (for error messages)
+ * @throws {TRPCError} - FORBIDDEN if user is not a member or lacks sufficient privileges
+ */
+function requireAdminRole(
+	teamMember: TeamMember | null,
+	operation: string,
+): void {
+	if (!teamMember) {
+		throw new TRPCError({
+			code: "FORBIDDEN",
+			message: "You are not a member of this team",
+		});
+	}
+
+	if (teamMember.role !== "owner" && teamMember.role !== "admin") {
+		throw new TRPCError({
+			code: "FORBIDDEN",
+			message: `Only team owners and admins can ${operation}`,
+		});
+	}
+}
 
 export const teamRouter = createTRPCRouter({
 	/**
@@ -1017,22 +1044,9 @@ export const teamRouter = createTRPCRouter({
 				},
 			});
 
-			if (!teamMember) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "You are not a member of this team",
-				});
-			}
+			requireAdminRole(teamMember, "delete admin API keys");
 
-			// 2. Check if user has sufficient privileges (owner or admin)
-			if (teamMember.role !== "owner" && teamMember.role !== "admin") {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "Only team owners and admins can delete admin API keys",
-				});
-			}
-
-			// 3. Find the admin key
+			// 2. Find the admin key
 			const adminKey = await ctx.db.organizationApiKey.findUnique({
 				where: {
 					unique_team_provider_org: {
@@ -1050,7 +1064,7 @@ export const teamRouter = createTRPCRouter({
 				});
 			}
 
-			// 4. Check if any projects are using this org
+			// 3. Check if any projects are using this org
 			const projectCount = await ctx.db.project.count({
 				where: {
 					teamId: input.teamId,
@@ -1066,12 +1080,12 @@ export const teamRouter = createTRPCRouter({
 				});
 			}
 
-			// 5. Delete the key
+			// 4. Delete the key
 			await ctx.db.organizationApiKey.delete({
 				where: { id: adminKey.id },
 			});
 
-			// 6. Audit log
+			// 5. Audit log
 			await ctx.db.auditLog.create({
 				data: {
 					userId,
@@ -1114,22 +1128,9 @@ export const teamRouter = createTRPCRouter({
 				},
 			});
 
-			if (!teamMember) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "You are not a member of this team",
-				});
-			}
+			requireAdminRole(teamMember, "toggle admin API keys");
 
-			// 2. Check if user has sufficient privileges (owner or admin)
-			if (teamMember.role !== "owner" && teamMember.role !== "admin") {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "Only team owners and admins can toggle admin API keys",
-				});
-			}
-
-			// 3. Find the admin key first (needed for resourceId)
+			// 2. Find the admin key first (needed for resourceId)
 			const adminKey = await ctx.db.organizationApiKey.findUnique({
 				where: {
 					unique_team_provider_org: {
@@ -1147,7 +1148,7 @@ export const teamRouter = createTRPCRouter({
 				});
 			}
 
-			// 4. Update the key
+			// 3. Update the key
 			await ctx.db.organizationApiKey.update({
 				where: { id: adminKey.id },
 				data: {
@@ -1155,7 +1156,7 @@ export const teamRouter = createTRPCRouter({
 				},
 			});
 
-			// 5. Audit log
+			// 4. Audit log
 			await ctx.db.auditLog.create({
 				data: {
 					userId,
