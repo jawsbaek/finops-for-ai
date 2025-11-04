@@ -1215,4 +1215,82 @@ export const projectRouter = createTRPCRouter({
 				aiProjectId: updatedProject.aiProjectId,
 			};
 		}),
+
+	/**
+	 * Unlink AI Provider from Project
+	 * Clears aiProvider, aiOrganizationId, aiProjectId fields
+	 */
+	unlinkAIProvider: protectedProcedure
+		.input(
+			z.object({
+				projectId: z.string(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const userId = ctx.session.user.id;
+
+			// 1. Verify project access
+			const project = await ctx.db.project.findUnique({
+				where: { id: input.projectId },
+				include: {
+					team: {
+						include: {
+							members: true,
+						},
+					},
+				},
+			});
+
+			if (!project) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Project not found",
+				});
+			}
+
+			const isMember = project.team.members.some((m) => m.userId === userId);
+
+			if (!isMember) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Access denied",
+				});
+			}
+
+			// 2. Clear provider fields
+			const updated = await ctx.db.project.update({
+				where: { id: input.projectId },
+				data: {
+					aiProvider: null,
+					aiOrganizationId: null,
+					aiProjectId: null,
+				},
+			});
+
+			// 3. Audit log
+			await ctx.db.auditLog.create({
+				data: {
+					userId,
+					actionType: "ai_provider_unlinked",
+					resourceType: "project",
+					resourceId: input.projectId,
+					metadata: {
+						previousProvider: project.aiProvider,
+						previousOrgId: project.aiOrganizationId,
+						previousProjectId: project.aiProjectId,
+					},
+				},
+			});
+
+			logger.info(
+				{
+					projectId: updated.id,
+					previousProvider: project.aiProvider,
+					userId,
+				},
+				"AI provider unlinked from project",
+			);
+
+			return { success: true };
+		}),
 });

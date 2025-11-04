@@ -1090,31 +1090,39 @@ export const teamRouter = createTRPCRouter({
 				});
 			}
 
-			// 2. Update the key
-			const updated = await ctx.db.organizationApiKey.updateMany({
+			// 2. Find the admin key first (needed for resourceId)
+			const adminKey = await ctx.db.organizationApiKey.findUnique({
 				where: {
-					teamId: input.teamId,
-					provider: input.provider,
-					organizationId: input.organizationId,
-				},
-				data: {
-					isActive: input.isActive,
+					unique_team_provider_org: {
+						teamId: input.teamId,
+						provider: input.provider,
+						organizationId: input.organizationId,
+					},
 				},
 			});
 
-			if (updated.count === 0) {
+			if (!adminKey) {
 				throw new TRPCError({
 					code: "NOT_FOUND",
 					message: "Admin key not found",
 				});
 			}
 
-			// 3. Audit log
+			// 3. Update the key
+			await ctx.db.organizationApiKey.update({
+				where: { id: adminKey.id },
+				data: {
+					isActive: input.isActive,
+				},
+			});
+
+			// 4. Audit log
 			await ctx.db.auditLog.create({
 				data: {
 					userId,
 					actionType: "admin_api_key_toggled",
 					resourceType: "organization_api_key",
+					resourceId: adminKey.id,
 					metadata: {
 						teamId: input.teamId,
 						provider: input.provider,
