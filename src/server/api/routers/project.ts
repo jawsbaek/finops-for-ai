@@ -1217,6 +1217,101 @@ export const projectRouter = createTRPCRouter({
 		}),
 
 	/**
+	 * Validate AI Project ID
+	 * Validates the project ID with the provider's API using the admin key
+	 */
+	validateAIProjectId: protectedProcedure
+		.input(
+			z.object({
+				projectId: z.string(),
+				provider: z.enum(["openai", "anthropic", "aws", "azure"]),
+				organizationId: z.string(),
+				aiProjectId: z.string(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const userId = ctx.session.user.id;
+
+			// 1. Verify project access
+			const project = await ctx.db.project.findUnique({
+				where: { id: input.projectId },
+				include: {
+					team: {
+						include: {
+							members: true,
+						},
+					},
+				},
+			});
+
+			if (!project) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Project not found",
+				});
+			}
+
+			const isMember = project.team.members.some((m) => m.userId === userId);
+
+			if (!isMember) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "Access denied",
+				});
+			}
+
+			// 2. Get admin key for this provider/org
+			const adminKey = await ctx.db.organizationApiKey.findFirst({
+				where: {
+					teamId: project.teamId,
+					provider: input.provider,
+					organizationId: input.organizationId,
+				},
+			});
+
+			if (!adminKey || !adminKey.isActive) {
+				return {
+					valid: false,
+					error: "No active admin key found for this provider and organization",
+				};
+			}
+
+			// 3. Decrypt admin key
+			const { decryptApiKey } = await import(
+				"~/lib/services/encryption/api-key-manager"
+			);
+			const decryptedKey = await decryptApiKey(
+				adminKey.encryptedKey,
+				adminKey.encryptedDataKey,
+				adminKey.iv,
+			);
+
+			// 4. Validate project ID with provider API
+			const { validateProviderProjectId } = await import(
+				"~/lib/services/providers/validation"
+			);
+			const validation = await validateProviderProjectId(
+				input.provider,
+				decryptedKey,
+				input.organizationId,
+				input.aiProjectId,
+			);
+
+			logger.info(
+				{
+					projectId: input.projectId,
+					provider: input.provider,
+					organizationId: input.organizationId,
+					valid: validation.valid,
+					userId,
+				},
+				"AI project ID validation completed",
+			);
+
+			return validation;
+		}),
+
+	/**
 	 * Unlink AI Provider from Project
 	 * Clears aiProvider, aiOrganizationId, aiProjectId fields
 	 */

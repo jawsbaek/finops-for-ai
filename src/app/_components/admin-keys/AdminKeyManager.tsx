@@ -126,13 +126,18 @@ export function AdminKeyManager({ teamId }: AdminKeyManagerProps) {
 				<h3 className="font-semibold text-lg">Registered Admin Keys</h3>
 				<AdminKeyList
 					keys={
-						adminKeys?.map((k) => ({
-							provider: k.provider,
-							organizationId: k.organizationId ?? "",
-							displayName: k.displayName ?? undefined,
-							last4: k.last4,
-							isActive: k.isActive,
-						})) ?? []
+						adminKeys
+							?.filter(
+								(k): k is typeof k & { organizationId: string } =>
+									k.organizationId != null,
+							)
+							.map((k) => ({
+								provider: k.provider,
+								organizationId: k.organizationId,
+								displayName: k.displayName ?? undefined,
+								last4: k.last4,
+								isActive: k.isActive,
+							})) ?? []
 					}
 					onToggle={handleToggle}
 					onDelete={handleDelete}

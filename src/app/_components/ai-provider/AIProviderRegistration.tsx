@@ -78,7 +78,9 @@ export function AIProviderRegistration({
 		adminKeys?.filter((k) => k.provider === selectedProvider && k.isActive) ??
 		[];
 
-	// Simulate validation (TODO: implement real validation query)
+	// Real-time validation via API
+	const validateMutation = api.project.validateAIProjectId.useMutation();
+
 	useEffect(() => {
 		if (!projectIdInput.trim() || !selectedProvider || !selectedOrg) {
 			setValidationStatus("idle");
@@ -89,26 +91,43 @@ export function AIProviderRegistration({
 		const timer = setTimeout(() => {
 			setValidationStatus("validating");
 
-			// Simulate API call
-			setTimeout(() => {
-				// Simple format validation for now
-				const isValid =
-					selectedProvider === "openai"
-						? /^proj_[a-zA-Z0-9_-]+$/.test(projectIdInput)
-						: /^[a-zA-Z0-9_-]+$/.test(projectIdInput);
-
-				if (isValid) {
-					setValidationStatus("valid");
-					setValidationError("");
-				} else {
-					setValidationStatus("invalid");
-					setValidationError("Invalid project ID format");
-				}
-			}, 1000);
+			validateMutation.mutate(
+				{
+					projectId,
+					provider: selectedProvider as
+						| "openai"
+						| "anthropic"
+						| "aws"
+						| "azure",
+					organizationId: selectedOrg,
+					aiProjectId: projectIdInput,
+				},
+				{
+					onSuccess: (result) => {
+						if (result.valid) {
+							setValidationStatus("valid");
+							setValidationError("");
+						} else {
+							setValidationStatus("invalid");
+							setValidationError(result.error ?? "Invalid project ID");
+						}
+					},
+					onError: (error) => {
+						setValidationStatus("invalid");
+						setValidationError(error.message);
+					},
+				},
+			);
 		}, 500);
 
 		return () => clearTimeout(timer);
-	}, [projectIdInput, selectedProvider, selectedOrg]);
+	}, [
+		projectIdInput,
+		selectedProvider,
+		selectedOrg,
+		projectId,
+		validateMutation,
+	]);
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
