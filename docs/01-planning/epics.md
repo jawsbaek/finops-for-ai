@@ -34,9 +34,9 @@ Each epic includes:
 
 **목표**: OpenAI Costs API 비용 추적, 실시간 폭주 방지, 행동 유도 리포트를 통해 즉각적인 가치 제공
 
-**기간**: Week 1-8 (확장됨: 보안 강화 및 최적화 포함)
+**기간**: Week 1-10 (확장됨: 보안 강화, 최적화, 테스트 및 UX 개선 포함)
 
-**예상 스토리 수**: 13개 (기존 9개 + 프로젝트 관리 4개)
+**예상 스토리 수**: 19개 (기존 9개 + 프로젝트 관리 4개 + 성능/테스트/UX 개선 6개)
 
 **가치 제안**:
 - 첫 주부터 OpenAI 비용 가시성 확보 (organization-level visibility)
@@ -483,6 +483,163 @@ model Project {
 
 ---
 
+### Story 1.14: API 키 관리 통합 및 컴포넌트 테스트 추가
+
+**As a** 개발자,
+**I want** API 키 관리 기능에 대한 포괄적인 통합 테스트와 컴포넌트 테스트를 추가하여,
+**So that** 코드 변경 시 회귀 버그를 조기에 발견하고 시스템의 안정성을 보장할 수 있다.
+
+**Acceptance Criteria:**
+1. `project.generateApiKey` mutation에 대한 서버 통합 테스트가 작성되어야 한다
+2. `validateApiKey` 함수의 모든 edge cases가 테스트되어야 한다 (sk-admin-, sk-proj- 등)
+3. `AddApiKeyDialog` 컴포넌트에 대한 React Testing Library 테스트가 작성되어야 한다
+4. 서버 에러 발생 시 UI에 에러 메시지가 표시되는지 테스트되어야 한다
+5. 프론트엔드 validation과 백엔드 validation이 일치하는지 테스트되어야 한다
+6. Playwright E2E 테스트가 추가되어 전체 플로우를 검증해야 한다
+7. 테스트 커버리지가 80% 이상이어야 한다
+8. CI/CD 파이프라인에서 모든 테스트가 자동 실행되어야 한다
+
+**Prerequisites:** Story 1.10 (API 키 관리 UI)
+
+**Priority:** 🟡 MEDIUM
+
+**Status:** 📋 TODO
+
+**Technical Notes:**
+- Integration tests: Test tRPC procedures with mock database
+- Component tests: Test user interactions and error states
+- E2E tests: Test complete user journey from login to API key creation
+- See detailed documentation: `docs/stories/1-14-api-키-관리-통합-및-컴포넌트-테스트-추가.md`
+
+---
+
+### Story 1.16: 성능 최적화 - react-hook-form
+
+**As a** 개발자,
+**I want** react-hook-form을 사용하여 폼 성능을 최적화하여,
+**So that** 불필요한 리렌더링을 줄이고 사용자 경험을 개선할 수 있다.
+
+**Acceptance Criteria:**
+1. react-hook-form 및 @hookform/resolvers 설치 완료
+2. Zod 스키마 검증 통합 완료
+3. Settings 페이지 폼 리팩토링 완료 (알림 임계값 설정)
+4. 팀 생성 폼 리팩토링 완료
+5. 프로젝트 생성 폼 리팩토링 완료
+6. 로그인/회원가입 폼 리팩토링 완료
+7. 모든 폼 검증 로직이 zod 스키마로 이동됨
+8. 리렌더링 횟수가 70% 이상 감소 확인 (React DevTools Profiler)
+9. 단위 테스트 및 E2E 테스트 통과
+
+**Prerequisites:** Story 1.13 (국제화 - Zod validation 메시지)
+
+**Priority:** 🟢 LOW
+
+**Status:** 📋 TODO
+
+**Technical Notes:**
+- Libraries: react-hook-form, @hookform/resolvers, zod
+- Migration strategy: Phase-wise (Settings → Dashboard forms → Auth forms)
+- Performance: Uncontrolled inputs for minimal re-renders
+- See detailed documentation: `docs/stories/1-16-성능-최적화-react-hook-form.md`
+
+---
+
+### Story 1.17: 성능 최적화 - API 캐싱 전략
+
+**As a** 시스템 사용자,
+**I want** API 호출이 적절하게 캐싱되어,
+**So that** 불필요한 네트워크 요청을 줄이고 빠른 페이지 로딩을 경험할 수 있다.
+
+**Acceptance Criteria:**
+1. `trpc/react.tsx`에 합리적인 기본 staleTime (1분) 설정
+2. refetchOnWindowFocus를 false로 설정
+3. `getRecentReports` 쿼리에 Infinity staleTime 적용 (불변 데이터)
+4. `getReportById` 쿼리에 Infinity staleTime 적용
+5. Settings 페이지 쿼리들에 5분 staleTime 적용
+6. 캐시 히트율 70% 이상 달성
+7. API 호출 횟수 40% 이상 감소
+8. React Query DevTools로 캐싱 동작 검증
+9. 캐싱 가이드 문서 작성 완료
+
+**Prerequisites:** Story 1.12 (쿼리 최적화)
+
+**Priority:** 🟡 MEDIUM
+
+**Status:** 📋 TODO
+
+**Technical Notes:**
+- TanStack Query v5: staleTime, gcTime configuration
+- Data classification: Real-time, Semi-real-time, Static, Immutable
+- Performance metrics: Cache hit rate, API call reduction
+- See detailed documentation: `docs/stories/1-17-성능-최적화-api-캐싱-전략.md`
+
+---
+
+### Story 1.18: Skeleton States로 사용자 경험 개선
+
+**As a** 사용자,
+**I want** 데이터 로딩 중에 스켈레톤 로더를 보고,
+**So that** 페이지 구조를 미리 파악하고 더 나은 로딩 경험을 할 수 있다.
+
+**Acceptance Criteria:**
+1. shadcn/ui Skeleton 컴포넌트 설치 완료
+2. Dashboard, Projects, Settings, Reports 페이지 스켈레톤 구현
+3. 모든 스켈레톤이 실제 레이아웃과 일치
+4. ARIA 속성 추가로 접근성 확보 (role="status", aria-live)
+5. Visual regression 테스트 통과
+6. A11y 테스트 통과 (jest-axe)
+7. 성능 테스트 통과 (렌더링 < 50ms)
+8. 재사용 가능한 skeleton 컴포넌트 라이브러리 구축
+
+**Prerequisites:** PR #45 (Loading states improvement)
+
+**Priority:** 🟢 LOW
+
+**Status:** 📋 TODO
+
+**Type:** 🎨 UX Enhancement (순수 미적 개선)
+
+**Technical Notes:**
+- Current implementation: Spinner (완벽히 작동)
+- Improvement: Skeleton loaders (better perceived performance)
+- Benefits: Layout preview, prevents layout shift, modern UX
+- See detailed documentation: `docs/stories/1-18-skeleton-states-개선.md`
+
+---
+
+### Story 1.19: 포괄적 에러 상태 처리
+
+**As a** 사용자,
+**I want** API 호출 실패 시 명확한 에러 메시지와 복구 옵션을 보고,
+**So that** 문제의 원인을 이해하고 적절한 조치를 취할 수 있다.
+
+**Acceptance Criteria:**
+1. `error-utils.ts` 유틸리티 함수 구현 완료 (에러 분류 및 로깅)
+2. `ErrorFallback` 컴포넌트 생성 (전체 페이지 에러)
+3. `InlineErrorFallback` 컴포넌트 생성 (섹션별 에러)
+4. React `ErrorBoundary` 구현 (예상치 못한 에러 catch)
+5. Dashboard, Projects, Settings, Reports 페이지에 에러 처리 추가
+6. 에러 유형별 한국어 메시지 제공 (네트워크, 인증, 권한, 서버, 유효성 검증)
+7. 복구 옵션 제공 (재시도, 홈으로, 로그아웃)
+8. 에러 로깅 설정 완료 (userId, url, timestamp 포함)
+9. 단위/컴포넌트/E2E 테스트 통과
+
+**Prerequisites:** PR #45 (Loading states improvement)
+
+**Priority:** 🟡 MEDIUM
+
+**Status:** 📋 TODO
+
+**Type:** 🔧 Enhancement
+
+**Technical Notes:**
+- Error types: NETWORK_ERROR, AUTHENTICATION_ERROR, AUTHORIZATION_ERROR, NOT_FOUND, VALIDATION_ERROR, SERVER_ERROR
+- Error boundary: Catch-all for unexpected errors
+- Logging: Structured logging with context
+- See detailed documentation: `docs/stories/1-19-포괄적-에러-상태-처리.md`
+
+---
+
 ## Epic 2: 클라우드 확장 및 검증 루프
 
 **목표**: AWS/Azure 통합으로 적용 범위 확대, 사용자 행동 측정을 통한 제품 개선 방향 확정
@@ -666,23 +823,40 @@ So that [benefit/value].
 
 ## Summary
 
-**Stories Rewritten:** 2 (Story 1.2, Story 1.7)
-**New AC Count:**
-- Story 1.2: 7 criteria (up from 5)
-- Story 1.7: 8 criteria (completely new structure)
+### Epic 1 Story Breakdown
 
-**Implementation Tasks Count:**
-- Story 1.2: 6 major tasks + testing
-- Story 1.7: 8 backend tasks + 4 frontend tasks + 4 testing tasks
+**Total Stories:** 19 (up from 13)
 
-**Dependencies Added:**
-- Story 1.2 now depends on Story 1.7 (Admin API Key required)
+**Story Categories:**
+1. **Core Infrastructure (1.1-1.9):** 9 stories - Foundational features
+2. **Project Management (1.10-1.13):** 4 stories - Member/API key management, security, i18n
+3. **Testing & Quality (1.14):** 1 story - Comprehensive test coverage
+4. **Performance Optimization (1.16-1.17):** 2 stories - Form optimization, API caching
+5. **UX Improvements (1.18-1.19):** 2 stories - Skeleton states, error handling
 
-**Key Changes:**
-1. Story 1.2 completely rewritten for Costs API (organization-level collection with pagination)
-2. Story 1.7 completely rewritten for Team Admin API Key + Project ID management
-3. All AC aligned with tech-spec-epic-1-v2.md
-4. Implementation tasks split between backend (tRPC) and frontend (UI)
-5. Time estimates updated: Story 1.2 (4 hours), Story 1.7 (6 hours)
+**Story 1.15:** ⚠️ **Intentionally Skipped** (reserved for future use)
 
-**For implementation:** Use the `create-story` workflow to generate individual story implementation plans from this epic breakdown.
+**Recently Added Stories (2025-11-04):**
+- ✅ Story 1.18: Skeleton States (LOW priority, UX enhancement)
+- ✅ Story 1.19: 포괄적 에러 상태 처리 (MEDIUM priority, enhancement)
+
+**Completed Stories:**
+- ✅ Story 1.10: 프로젝트 멤버 및 API 키 관리 UI (2025-11-03)
+
+**Stories Rewritten (Costs API Migration):**
+- Story 1.2: OpenAI Costs API 비용 수집 (7 AC, organization-level)
+- Story 1.7: 팀 Admin API 키 등록 (8 AC, completely new structure)
+
+**Key Dependencies:**
+- Story 1.2 depends on Story 1.7 (Admin API Key required)
+- Story 1.16 depends on Story 1.13 (Zod validation i18n)
+- Story 1.17 depends on Story 1.12 (Query optimization)
+- Story 1.18 depends on PR #45 (Loading states)
+- Story 1.19 depends on PR #45 (Loading states)
+
+**Implementation Status:**
+- **TODO:** Stories 1.14, 1.16, 1.17, 1.18, 1.19
+- **In Progress:** (check individual story files)
+- **Completed:** Story 1.10 (2025-11-03)
+
+**For implementation:** Use the `/bmad:bmm:workflows:dev-story` workflow to implement individual stories from this epic breakdown.
