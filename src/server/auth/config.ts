@@ -64,10 +64,14 @@ export const authConfig = {
 				// Block if 5+ failed attempts in last 15 minutes
 				if (recentFailedAttempts >= 5) {
 					// Log this blocked attempt
+					// Note: IP address tracking is currently unavailable in CredentialsProvider
+					// NextAuth's authorize function doesn't expose request headers
+					// TODO: Implement custom signIn callback to capture real IP addresses
+					// See: https://next-auth.js.org/configuration/callbacks#sign-in-callback
 					await db.loginAttempt.create({
 						data: {
 							email,
-							ipAddress: "server", // Will be enhanced with real IP in middleware
+							ipAddress: "unknown",
 							successful: false,
 						},
 					});
@@ -80,11 +84,11 @@ export const authConfig = {
 				});
 
 				if (!user) {
-					// Log failed attempt
+					// Log failed attempt (IP tracking limitation noted above)
 					await db.loginAttempt.create({
 						data: {
 							email,
-							ipAddress: "server",
+							ipAddress: "unknown",
 							successful: false,
 						},
 					});
@@ -94,11 +98,11 @@ export const authConfig = {
 				// Verify password
 				const isValid = await bcrypt.compare(password, user.passwordHash);
 
-				// Log attempt
+				// Log attempt (successful or failed)
 				await db.loginAttempt.create({
 					data: {
 						email,
-						ipAddress: "server",
+						ipAddress: "unknown",
 						successful: isValid,
 					},
 				});

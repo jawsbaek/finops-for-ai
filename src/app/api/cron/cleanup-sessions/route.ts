@@ -21,7 +21,22 @@ export async function GET(request: Request) {
 		const authHeader = request.headers.get("authorization");
 		const cronSecret = process.env.CRON_SECRET;
 
-		if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+		// CRON_SECRET must be configured for security
+		if (!cronSecret) {
+			logger.error(
+				{
+					endpoint: "/api/cron/cleanup-sessions",
+				},
+				"CRON_SECRET environment variable not configured",
+			);
+
+			return NextResponse.json(
+				{ error: "Server misconfigured" },
+				{ status: 500 },
+			);
+		}
+
+		if (authHeader !== `Bearer ${cronSecret}`) {
 			logger.warn(
 				{
 					endpoint: "/api/cron/cleanup-sessions",

@@ -275,5 +275,6 @@ model LoginAttempt {
 
   @@index([email, attemptedAt])
   @@index([ipAddress, attemptedAt])
+  @@index([attemptedAt]) // For efficient cleanup queries
   @@map("login_attempts")
 }

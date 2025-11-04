@@ -7,7 +7,10 @@ import {
 	publicProcedure,
 } from "~/server/api/trpc";
 
-const BCRYPT_ROUNDS = 10;
+// Bcrypt work factor (cost)
+// Higher = more secure but slower. Recommended: 12+ for production
+// Can be overridden via BCRYPT_ROUNDS env var
+const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || "12", 10);
 
 export const authRouter = createTRPCRouter({
 	signup: publicProcedure
@@ -167,8 +170,13 @@ export const authRouter = createTRPCRouter({
 	 *
 	 * Security features:
 	 * - Verifies current password before allowing change
-	 * - Invalidates all other sessions (force logout on all devices)
-	 * - Keeps current session active for better UX
+	 * - Invalidates ALL sessions (including current) for maximum security
+	 * - User must re-login after password change
+	 *
+	 * Note: We invalidate all sessions including the current one because:
+	 * 1. Database session strategy doesn't expose sessionToken in tRPC context
+	 * 2. Forces re-authentication, which is a security best practice
+	 * 3. Ensures the new password is verified immediately
 	 */
 	changePassword: protectedProcedure
 		.input(
@@ -219,22 +227,16 @@ export const authRouter = createTRPCRouter({
 				data: { passwordHash: newPasswordHash },
 			});
 
-			// Invalidate all other sessions for security
-			// Note: With database sessions, we can do this immediately
+			// Invalidate ALL sessions for security
+			// This includes the current session - user will need to re-login
 			await ctx.db.session.deleteMany({
-				where: {
-					userId,
-					// Keep only the current session active
-					NOT: {
-						sessionToken: ctx.session.user.id, // This will be handled by NextAuth
-					},
-				},
+				where: { userId },
 			});
 
 			return {
 				success: true,
 				message:
-					"Password changed successfully. All other sessions have been logged out.",
+					"Password changed successfully. Please log in again with your new password.",
 			};
 		}),
 
