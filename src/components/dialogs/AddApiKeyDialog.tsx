@@ -26,6 +26,7 @@ interface AddApiKeyDialogProps {
 	onOpenChange: (open: boolean) => void;
 	onConfirm: (provider: "openai", apiKey: string) => void;
 	isLoading?: boolean;
+	serverError?: string;
 }
 
 /**
@@ -42,24 +43,30 @@ export function AddApiKeyDialog({
 	onOpenChange,
 	onConfirm,
 	isLoading = false,
+	serverError,
 }: AddApiKeyDialogProps) {
 	const [provider, setProvider] = useState<"openai">("openai");
 	const [apiKey, setApiKey] = useState("");
-	const [error, setError] = useState("");
+	const [clientError, setClientError] = useState("");
+
+	// Combine client and server errors, prioritizing server errors
+	const error = serverError || clientError;
 
 	const handleConfirm = () => {
 		// Validate API key format
 		if (!apiKey.trim()) {
-			setError("API 키를 입력해주세요");
+			setClientError("API 키를 입력해주세요");
 			return;
 		}
 
 		if (provider === "openai" && !apiKey.startsWith("sk-")) {
-			setError("올바른 OpenAI API 키 형식이 아닙니다 (sk-로 시작해야 합니다)");
+			setClientError(
+				"올바른 OpenAI API 키 형식이 아닙니다 (sk-로 시작해야 합니다)",
+			);
 			return;
 		}
 
-		setError("");
+		setClientError("");
 		onConfirm(provider, apiKey);
 		// Form will be reset when dialog closes via handleOpenChange
 	};
@@ -73,7 +80,7 @@ export function AddApiKeyDialog({
 		if (!newOpen) {
 			setProvider("openai");
 			setApiKey("");
-			setError("");
+			setClientError("");
 		}
 		onOpenChange(newOpen);
 	};
@@ -130,7 +137,7 @@ export function AddApiKeyDialog({
 							value={apiKey}
 							onChange={(e) => {
 								setApiKey(e.target.value);
-								setError("");
+								setClientError("");
 							}}
 							disabled={isLoading}
 							className="font-mono"

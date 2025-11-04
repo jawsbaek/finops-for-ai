@@ -51,6 +51,9 @@ export default function ProjectDetailPage() {
 
 	// State for API key dialogs
 	const [addApiKeyDialogOpen, setAddApiKeyDialogOpen] = useState(false);
+	const [apiKeyServerError, setApiKeyServerError] = useState<
+		string | undefined
+	>(undefined);
 	const [disableDialogOpen, setDisableDialogOpen] = useState(false);
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 	const [selectedApiKeyId, setSelectedApiKeyId] = useState<string | null>(null);
@@ -127,12 +130,12 @@ export default function ProjectDetailPage() {
 				description: "API 키가 안전하게 암호화되어 저장되었습니다",
 			});
 			setAddApiKeyDialogOpen(false);
+			setApiKeyServerError(undefined);
 			void utils.project.getById.invalidate({ id: projectId });
 		},
 		onError: (error) => {
-			toast.error("API 키 추가 실패", {
-				description: error.message,
-			});
+			// Show error in dialog instead of toast so user can see it
+			setApiKeyServerError(error.message);
 		},
 	});
 
@@ -251,11 +254,22 @@ export default function ProjectDetailPage() {
 
 	// Handle add API key
 	const handleAddApiKey = (provider: "openai", apiKey: string) => {
+		// Clear previous server error
+		setApiKeyServerError(undefined);
 		generateApiKey.mutate({
 			projectId,
 			provider,
 			apiKey,
 		});
+	};
+
+	// Handle API key dialog open change
+	const handleAddApiKeyDialogOpenChange = (open: boolean) => {
+		setAddApiKeyDialogOpen(open);
+		// Clear server error when dialog opens/closes
+		if (!open) {
+			setApiKeyServerError(undefined);
+		}
 	};
 
 	// Handle add member
@@ -726,9 +740,10 @@ export default function ProjectDetailPage() {
 
 			<AddApiKeyDialog
 				open={addApiKeyDialogOpen}
-				onOpenChange={setAddApiKeyDialogOpen}
+				onOpenChange={handleAddApiKeyDialogOpenChange}
 				onConfirm={handleAddApiKey}
 				isLoading={generateApiKey.isPending}
+				serverError={apiKeyServerError}
 			/>
 
 			<ConfirmDisableKeyDialog
