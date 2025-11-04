@@ -1,8 +1,13 @@
+import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import pino from "pino";
 import type { ValidationResult } from "./validation";
 
 const logger = pino({ name: "openai-validator" });
+
+// Timeout constants (milliseconds)
+const ORG_FETCH_TIMEOUT_MS = 5000; // 5 seconds
+const VALIDATION_TIMEOUT_MS = 5000; // 5 seconds
 
 // Simple in-memory cache for validation results (5 minutes TTL)
 const validationCache = new Map<
@@ -39,7 +44,7 @@ export async function fetchOpenAIOrganizationId(
 				Authorization: `Bearer ${adminApiKey}`,
 				"Content-Type": "application/json",
 			},
-			signal: AbortSignal.timeout(5000),
+			signal: AbortSignal.timeout(ORG_FETCH_TIMEOUT_MS),
 		});
 
 		if (!response.ok) {
@@ -99,7 +104,10 @@ export async function validateOpenAIProjectId(
 ): Promise<ValidationResult> {
 	// Check cache first
 	cleanExpiredCache();
-	const cacheKey = `${projectId}-${adminApiKey.slice(-4)}`;
+	// Use hash for cache key to prevent API key exposure
+	const cacheKey = createHash("sha256")
+		.update(`${projectId}-${adminApiKey}`)
+		.digest("hex");
 	const cached = validationCache.get(cacheKey);
 
 	if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -115,7 +123,7 @@ export async function validateOpenAIProjectId(
 					Authorization: `Bearer ${adminApiKey}`,
 					"Content-Type": "application/json",
 				},
-				signal: AbortSignal.timeout(5000),
+				signal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
 			},
 		);
 
