@@ -47,24 +47,23 @@ export default function LoginPage() {
 			});
 
 			if (response?.error) {
-				const errorMsg = "Invalid email or password";
-				setErrors({ general: errorMsg });
+				setErrors({ general: "Invalid email or password" });
 				toast.error("로그인 실패", {
-					description: errorMsg,
+					description: "Invalid email or password",
 				});
 				setIsLoading(false);
 				return;
 			}
 
 			// Redirect to dashboard on success
+			// Note: isLoading remains true during navigation to prevent duplicate clicks
 			toast.success("로그인 성공!");
 			router.push("/dashboard");
 		} catch (error) {
 			console.error("Login error:", error);
-			const errorMsg = "An unexpected error occurred";
-			setErrors({ general: errorMsg });
+			setErrors({ general: "An unexpected error occurred" });
 			toast.error("로그인 실패", {
-				description: errorMsg,
+				description: "An unexpected error occurred",
 			});
 			setIsLoading(false);
 		}

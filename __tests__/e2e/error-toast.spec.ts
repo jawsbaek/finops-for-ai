@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { setupTestUser } from "./helpers";
+import { generateTestUser, setupTestUser } from "./helpers";
 
 /**
  * Error Toast Verification Tests
@@ -29,19 +29,25 @@ test.describe("Error Toast Handling", () => {
 	test("should show error toast when signup fails with existing email", async ({
 		page,
 	}) => {
-		// First, setup a test user
-		await setupTestUser(page);
+		// First, create an existing user
+		const existingUser = generateTestUser();
+		await page.goto("/signup");
+		await page.fill('input[name="name"]', existingUser.name);
+		await page.fill('input[name="email"]', existingUser.email);
+		await page.fill('input[name="password"]', existingUser.password);
+		await page.click('button[type="submit"]');
 
-		// Logout
+		// Wait for successful signup and redirect
+		await page.waitForURL("/dashboard", { timeout: 10000 });
+
+		// Logout (go back to login page)
 		await page.goto("/login");
 
-		// Go to signup page
+		// Go to signup page and try to signup with the same email
 		await page.goto("/signup");
-
-		// Try to signup with the same email
-		await page.fill('input[name="name"]', "Test User");
-		await page.fill('input[name="email"]', "test@example.com");
-		await page.fill('input[name="password"]', "testpassword123");
+		await page.fill('input[name="name"]', "Duplicate User");
+		await page.fill('input[name="email"]', existingUser.email);
+		await page.fill('input[name="password"]', "differentpassword123");
 
 		// Submit the form
 		await page.click('button[type="submit"]');
@@ -62,7 +68,7 @@ test.describe("Error Toast Handling", () => {
 		await page.goto("/teams");
 
 		// Open the create team dialog
-		await page.click('button:has-text("새 팀 생성")');
+		await page.click('[data-testid="create-team-button"]');
 
 		// Mock API to return error
 		await page.route("**/api/trpc/team.create*", (route) => {
@@ -78,9 +84,9 @@ test.describe("Error Toast Handling", () => {
 			});
 		});
 
-		// Try to create a team (leave name empty to trigger client-side validation first)
+		// Try to create a team
 		await page.fill('input[id="name"]', "Test Team");
-		await page.click('button:has-text("생성")');
+		await page.click('[data-testid="confirm-create-team"]');
 
 		// Wait for the error toast to appear
 		const toast = page.locator('[data-sonner-toast][data-type="error"]');
@@ -96,16 +102,18 @@ test.describe("Error Toast Handling", () => {
 		// Setup test user and create a team first
 		await setupTestUser(page);
 		await page.goto("/teams");
-		await page.click('button:has-text("새 팀 생성")');
+		await page.click('[data-testid="create-team-button"]');
 		await page.fill('input[id="name"]', "Test Team");
-		await page.click('button:has-text("생성")');
-		await page.waitForTimeout(1000);
+		await page.click('[data-testid="confirm-create-team"]');
+
+		// Wait for navigation to team detail page
+		await page.waitForURL(/\/teams\/[^/]+$/, { timeout: 10000 });
 
 		// Navigate to projects page
 		await page.goto("/projects");
 
 		// Open create project dialog
-		await page.click('button:has-text("새 프로젝트")');
+		await page.click('[data-testid="create-project-button"]');
 
 		// Mock API to return error
 		await page.route("**/api/trpc/project.create*", (route) => {
@@ -123,7 +131,7 @@ test.describe("Error Toast Handling", () => {
 
 		// Try to create a project
 		await page.fill('input[id="name"]', "Test Project");
-		await page.click('button:has-text("생성")');
+		await page.click('[data-testid="confirm-create-project"]');
 
 		// Wait for the error toast to appear
 		const toast = page.locator('[data-sonner-toast][data-type="error"]');
@@ -141,17 +149,21 @@ test.describe("Error Toast Handling", () => {
 
 		// Create team
 		await page.goto("/teams");
-		await page.click('button:has-text("새 팀 생성")');
+		await page.click('[data-testid="create-team-button"]');
 		await page.fill('input[id="name"]', "Test Team");
-		await page.click('button:has-text("생성")');
-		await page.waitForTimeout(1000);
+		await page.click('[data-testid="confirm-create-team"]');
+
+		// Wait for navigation to team detail page
+		await page.waitForURL(/\/teams\/[^/]+$/, { timeout: 10000 });
 
 		// Create project
 		await page.goto("/projects");
-		await page.click('button:has-text("새 프로젝트")');
+		await page.click('[data-testid="create-project-button"]');
 		await page.fill('input[id="name"]', "Test Project");
-		await page.click('button:has-text("생성")');
-		await page.waitForTimeout(1000);
+		await page.click('[data-testid="confirm-create-project"]');
+
+		// Wait for navigation to project detail page
+		await page.waitForURL(/\/projects\/[^/]+$/, { timeout: 10000 });
 
 		// Mock API to return error for API key generation
 		await page.route("**/api/trpc/project.generateApiKey*", (route) => {
@@ -168,7 +180,7 @@ test.describe("Error Toast Handling", () => {
 		});
 
 		// Try to add an API key
-		await page.click('button:has-text("API 키 추가")');
+		await page.click('[data-testid="add-api-key-button"]');
 		await page.fill(
 			'input[placeholder*="sk-"]',
 			"sk-test-invalid-key-for-testing",
@@ -191,20 +203,25 @@ test.describe("Error Toast Handling", () => {
 
 		// Create team
 		await page.goto("/teams");
-		await page.click('button:has-text("새 팀 생성")');
+		await page.click('[data-testid="create-team-button"]');
 		await page.fill('input[id="name"]', "Test Team");
-		await page.click('button:has-text("생성")');
-		await page.waitForTimeout(1000);
+		await page.click('[data-testid="confirm-create-team"]');
+
+		// Wait for navigation to team detail page
+		await page.waitForURL(/\/teams\/[^/]+$/, { timeout: 10000 });
 
 		// Create project
 		await page.goto("/projects");
-		await page.click('button:has-text("새 프로젝트")');
+		await page.click('[data-testid="create-project-button"]');
 		await page.fill('input[id="name"]', "Test Project");
-		await page.click('button:has-text("생성")');
-		await page.waitForTimeout(2000);
+		await page.click('[data-testid="confirm-create-project"]');
+
+		// Wait for navigation to project detail page
+		await page.waitForURL(/\/projects\/[^/]+$/, { timeout: 10000 });
 
 		// Get the project ID from URL and navigate to settings
-		const projectId = page.url().split("/projects/")[1];
+		const currentUrl = page.url();
+		const projectId = currentUrl.split("/projects/")[1]?.split("/")[0];
 		await page.goto(`/projects/${projectId}/settings`);
 
 		// Mock API to return error

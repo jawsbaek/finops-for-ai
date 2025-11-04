@@ -110,7 +110,7 @@ export function ProjectListClient({
 				) : (
 					<Dialog open={open} onOpenChange={setOpen}>
 						<DialogTrigger asChild>
-							<Button>
+							<Button data-testid="create-project-button">
 								<Plus className="mr-2 h-4 w-4" />새 프로젝트
 							</Button>
 						</DialogTrigger>
@@ -161,6 +161,7 @@ export function ProjectListClient({
 									취소
 								</Button>
 								<Button
+									data-testid="confirm-create-project"
 									onClick={handleCreateProject}
 									disabled={createProject.isPending || !name.trim()}
 								>

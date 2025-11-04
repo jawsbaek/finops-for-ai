@@ -35,26 +35,26 @@ export default function SignupPage() {
 			});
 
 			if (response?.ok) {
+				// Note: isLoading remains true during navigation to prevent duplicate clicks
 				toast.success("회원가입 성공!", {
 					description: "대시보드로 이동합니다.",
 				});
 				router.push("/dashboard");
 			} else {
-				const errorMsg =
-					"Account created but login failed. Please try logging in manually.";
 				setErrors({
-					general: errorMsg,
+					general:
+						"Account created but login failed. Please try logging in manually.",
 				});
 				toast.error("자동 로그인 실패", {
-					description: errorMsg,
+					description:
+						"Account created but login failed. Please try logging in manually.",
 				});
 			}
 		},
 		onError: (error) => {
-			const errorMsg = error.message || "Failed to create account";
-			setErrors({ general: errorMsg });
+			setErrors({ general: error.message || "Failed to create account" });
 			toast.error("회원가입 실패", {
-				description: errorMsg,
+				description: error.message || "Failed to create account",
 			});
 		},
 	});
