@@ -968,4 +968,162 @@ export const teamRouter = createTRPCRouter({
 
 			return adminKeys;
 		}),
+
+	/**
+	 * Delete an Admin API Key
+	 * Prevents deletion if projects are using this organization
+	 */
+	deleteAdminApiKey: protectedProcedure
+		.input(
+			z.object({
+				teamId: z.string(),
+				provider: z.enum(["openai", "anthropic", "aws", "azure"]),
+				organizationId: z.string(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const userId = ctx.session.user.id;
+
+			// 1. Verify team membership
+			const teamMember = await ctx.db.teamMember.findUnique({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId,
+					},
+				},
+			});
+
+			if (!teamMember) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You are not a member of this team",
+				});
+			}
+
+			// 2. Find the admin key
+			const adminKey = await ctx.db.organizationApiKey.findUnique({
+				where: {
+					unique_team_provider_org: {
+						teamId: input.teamId,
+						provider: input.provider,
+						organizationId: input.organizationId,
+					},
+				},
+			});
+
+			if (!adminKey) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Admin key not found",
+				});
+			}
+
+			// 3. Check if any projects are using this org
+			const projectCount = await ctx.db.project.count({
+				where: {
+					teamId: input.teamId,
+					aiProvider: input.provider,
+					aiOrganizationId: input.organizationId,
+				},
+			});
+
+			if (projectCount > 0) {
+				throw new TRPCError({
+					code: "PRECONDITION_FAILED",
+					message: `Cannot delete: ${projectCount} project(s) are using this organization`,
+				});
+			}
+
+			// 4. Delete the key
+			await ctx.db.organizationApiKey.delete({
+				where: { id: adminKey.id },
+			});
+
+			// 5. Audit log
+			await ctx.db.auditLog.create({
+				data: {
+					userId,
+					actionType: "admin_api_key_deleted",
+					resourceType: "organization_api_key",
+					resourceId: adminKey.id,
+					metadata: {
+						teamId: input.teamId,
+						provider: input.provider,
+						organizationId: input.organizationId,
+					},
+				},
+			});
+
+			return { success: true };
+		}),
+
+	/**
+	 * Toggle Admin API Key active/inactive status
+	 */
+	toggleAdminApiKey: protectedProcedure
+		.input(
+			z.object({
+				teamId: z.string(),
+				provider: z.enum(["openai", "anthropic", "aws", "azure"]),
+				organizationId: z.string(),
+				isActive: z.boolean(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const userId = ctx.session.user.id;
+
+			// 1. Verify team membership
+			const teamMember = await ctx.db.teamMember.findUnique({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId,
+					},
+				},
+			});
+
+			if (!teamMember) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You are not a member of this team",
+				});
+			}
+
+			// 2. Update the key
+			const updated = await ctx.db.organizationApiKey.updateMany({
+				where: {
+					teamId: input.teamId,
+					provider: input.provider,
+					organizationId: input.organizationId,
+				},
+				data: {
+					isActive: input.isActive,
+				},
+			});
+
+			if (updated.count === 0) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Admin key not found",
+				});
+			}
+
+			// 3. Audit log
+			await ctx.db.auditLog.create({
+				data: {
+					userId,
+					actionType: "admin_api_key_toggled",
+					resourceType: "organization_api_key",
+					metadata: {
+						teamId: input.teamId,
+						provider: input.provider,
+						organizationId: input.organizationId,
+						isActive: input.isActive,
+					},
+				},
+			});
+
+			return { success: true, isActive: input.isActive };
+		}),
 });
