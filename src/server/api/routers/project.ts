@@ -1232,13 +1232,21 @@ export const projectRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const userId = ctx.session.user.id;
 
-			// 1. Verify project access
+			// 1. Verify project access (project member OR team admin)
 			const project = await ctx.db.project.findUnique({
 				where: { id: input.projectId },
 				include: {
+					members: {
+						where: { userId },
+					},
 					team: {
 						include: {
-							members: true,
+							members: {
+								where: {
+									userId,
+									role: { in: ["owner", "admin"] },
+								},
+							},
 						},
 					},
 				},
@@ -1251,12 +1259,13 @@ export const projectRouter = createTRPCRouter({
 				});
 			}
 
-			const isMember = project.team.members.some((m) => m.userId === userId);
+			const isProjectMember = project.members.length > 0;
+			const isTeamAdmin = project.team.members.length > 0;
 
-			if (!isMember) {
+			if (!isProjectMember && !isTeamAdmin) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "Access denied",
+					message: "You do not have access to this project",
 				});
 			}
 
@@ -1324,13 +1333,21 @@ export const projectRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const userId = ctx.session.user.id;
 
-			// 1. Verify project access
+			// 1. Verify project access (project member OR team admin)
 			const project = await ctx.db.project.findUnique({
 				where: { id: input.projectId },
 				include: {
+					members: {
+						where: { userId },
+					},
 					team: {
 						include: {
-							members: true,
+							members: {
+								where: {
+									userId,
+									role: { in: ["owner", "admin"] },
+								},
+							},
 						},
 					},
 				},
@@ -1343,12 +1360,13 @@ export const projectRouter = createTRPCRouter({
 				});
 			}
 
-			const isMember = project.team.members.some((m) => m.userId === userId);
+			const isProjectMember = project.members.length > 0;
+			const isTeamAdmin = project.team.members.length > 0;
 
-			if (!isMember) {
+			if (!isProjectMember && !isTeamAdmin) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "Access denied",
+					message: "You do not have access to this project",
 				});
 			}
 
