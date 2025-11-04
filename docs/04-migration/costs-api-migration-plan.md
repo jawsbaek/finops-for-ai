@@ -1307,24 +1307,143 @@ bun run scripts/test-costs-api.ts <team-id>
 2. 데이터 수집 실패율 > 50%
 3. 비용 데이터 불일치 (Usage API vs. Costs API)
 
-**Rollback 절차:**
+### 8.2 Pre-Migration Backup Checklist
+
+**마이그레이션 전 필수 백업:**
 
 ```bash
-# 1. Feature flag로 Usage API 복원
-# .env 또는 Vercel 환경 변수
-ENABLE_COSTS_API=false
+# 1. 데이터베이스 백업 (production)
+pg_dump -h <db_host> -U <db_user> -d <db_name> -F c -b -v -f backup_pre_migration_$(date +%Y%m%d_%H%M%S).dump
 
-# 2. Cron job 코드 롤백 (Git)
-git revert <costs-api-commit-sha>
+# 2. 환경 변수 백업
+# Vercel dashboard에서 Environment Variables 전체 export
+# 또는 CLI로:
+vercel env pull .env.production.backup
 
-# 3. 데이터베이스 스키마는 유지 (backward compatible)
-# 기존 Usage API는 apiVersion='usage_v1'로 계속 저장 가능
+# 3. Git 커밋 SHA 기록
+echo "Current commit: $(git rev-parse HEAD)" > rollback_info.txt
+git log -1 --format="%H %s %ci" >> rollback_info.txt
 
-# 4. Costs API 데이터 임시 비활성화
-UPDATE cost_data SET api_version = 'costs_v1_rollback' WHERE api_version = 'costs_v1';
+# 4. 현재 Cost Collection 설정 백업
+# DB에서 현재 OrganizationApiKey와 Project.openaiProjectId 상태 스냅샷
+psql -h <db_host> -U <db_user> -d <db_name> -c "\COPY (SELECT id, team_id, provider, is_active FROM organization_api_keys) TO 'api_keys_backup.csv' CSV HEADER"
+psql -h <db_host> -U <db_user> -d <db_name> -c "\COPY (SELECT id, name, openai_project_id FROM projects WHERE openai_project_id IS NOT NULL) TO 'projects_backup.csv' CSV HEADER"
 ```
 
-### 8.2 Backward Compatibility 전략
+### 8.3 Rollback Procedure (Step-by-Step)
+
+**Phase 1: Immediate Stop (5 minutes)**
+
+```bash
+# 1. Vercel Cron Job 비활성화 (UI 또는 CLI)
+# Dashboard → Settings → Cron Jobs → Disable cost collection
+
+# 2. Feature Flag로 신규 데이터 수집 중단
+vercel env add ENABLE_MULTI_ORG_COST_COLLECTION false
+
+# 3. 현재 배포 중단 (필요 시)
+vercel rollback <deployment-url>
+```
+
+**Phase 2: Code Rollback (10 minutes)**
+
+```bash
+# 4. Git으로 이전 안정 버전 복원
+git revert <migration-commit-sha>
+# 또는 전체 롤백:
+git reset --hard <pre-migration-commit-sha>
+
+# 5. 배포 (Vercel)
+git push origin main --force
+
+# 6. 배포 완료 확인
+vercel --prod
+```
+
+**Phase 3: Database Cleanup (15 minutes)**
+
+```bash
+# 7. Costs API 데이터 임시 비활성화 (삭제하지 않고 마킹)
+psql -h <db_host> -U <db_user> -d <db_name> << EOF
+-- Costs API 데이터에 rollback 플래그 추가
+UPDATE cost_data
+SET api_version = 'costs_v1_rollback'
+WHERE api_version = 'costs_v1';
+
+-- OrganizationApiKey 비활성화
+UPDATE organization_api_keys
+SET is_active = false
+WHERE provider = 'openai';
+
+-- Project OpenAI ID 임시 제거 (백업됨)
+UPDATE projects
+SET openai_project_id = NULL
+WHERE openai_project_id IS NOT NULL;
+EOF
+
+# 8. 백업 데이터 복원 확인
+# api_keys_backup.csv와 projects_backup.csv가 있는지 확인
+ls -lh *_backup.csv
+```
+
+**Phase 4: Legacy API 복원 (20 minutes)**
+
+```bash
+# 9. Usage API 엔드포인트 재활성화
+# 코드에서 feature flag 또는 환경 변수 확인
+vercel env add ENABLE_COSTS_API false
+vercel env add ENABLE_USAGE_API true
+
+# 10. Legacy cost collector 재배포
+# cost-collector.ts (Usage API 버전)가 정상 작동하는지 수동 테스트
+bun run src/cron/cost-collection-test.ts
+
+# 11. Vercel Cron Job 재활성화 (Legacy 버전)
+# Dashboard → Settings → Cron Jobs → Enable
+```
+
+**Phase 5: Validation (10 minutes)**
+
+```bash
+# 12. UI 정상 작동 확인
+curl https://<production-url>/api/trpc/cost.getTeamCosts
+
+# 13. Sentry 에러율 확인
+# Dashboard → Issues → Last 1 hour error rate < 1%
+
+# 14. Cost collection 로그 확인
+vercel logs --follow --since 10m
+```
+
+### 8.4 Data Recovery Procedure
+
+**백업에서 데이터 복원이 필요한 경우:**
+
+```bash
+# 1. 전체 데이터베이스 복원 (최후 수단)
+pg_restore -h <db_host> -U <db_user> -d <db_name> -v backup_pre_migration_<timestamp>.dump
+
+# 2. 특정 테이블만 복원
+pg_restore -h <db_host> -U <db_user> -d <db_name> -t organization_api_keys backup_pre_migration_<timestamp>.dump
+pg_restore -h <db_host> -U <db_user> -d <db_name> -t projects backup_pre_migration_<timestamp>.dump
+
+# 3. CSV 백업에서 복원
+psql -h <db_host> -U <db_user> -d <db_name> -c "\COPY organization_api_keys FROM 'api_keys_backup.csv' CSV HEADER"
+psql -h <db_host> -U <db_user> -d <db_name> -c "\COPY projects (id, name, openai_project_id) FROM 'projects_backup.csv' CSV HEADER"
+```
+
+### 8.5 Downtime Expectations
+
+| Phase | Expected Downtime | Impact |
+|-------|-------------------|--------|
+| Phase 1: Immediate Stop | 0 min | UI continues working with cached data |
+| Phase 2: Code Rollback | 2-5 min | UI 접속 가능, cost collection 일시 중단 |
+| Phase 3: DB Cleanup | 0 min | Background operation |
+| Phase 4: Legacy API 복원 | 0 min | Gradual restoration |
+| Phase 5: Validation | 0 min | Monitoring only |
+| **Total** | **2-5 minutes** | Minimal user impact |
+
+### 8.6 Backward Compatibility 전략
 
 스키마 설계 시 **additive-only** 원칙:
 - ✅ 새 필드는 모두 `nullable` 또는 `default` 값
@@ -1332,6 +1451,22 @@ UPDATE cost_data SET api_version = 'costs_v1_rollback' WHERE api_version = 'cost
 - ✅ Unique constraint는 API 버전별로 분리
 
 이렇게 하면 Usage API와 Costs API를 **동시에 사용 가능**하며, 롤백 시에도 데이터 손실 없음.
+
+### 8.7 Post-Rollback Actions
+
+```bash
+# 1. 팀에 알림
+# Slack/Email로 rollback 사실과 원인 공유
+
+# 2. 문제 원인 분석 회의 스케줄링
+# Migration failure postmortem
+
+# 3. Costs API 재시도 계획 수립
+# 문제 해결 후 재시도 타임라인 결정
+
+# 4. 백업 파일 아카이빙
+mv *_backup.* /backups/archive/$(date +%Y%m%d)/
+```
 
 ---
 

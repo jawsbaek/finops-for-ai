@@ -4,33 +4,41 @@
  * Tests sendCostAlertEmail template rendering, Resend API integration, and retry logic
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock dependencies - vi is available globally due to globals: true in vitest.config.ts
+// Mock dependencies using vi.hoisted() pattern per CLAUDE.md guidelines
+const mockEnv = vi.hoisted(() => ({
+	RESEND_API_KEY: "re_test_key_123",
+	RESEND_FROM_EMAIL: "test@example.com",
+}));
+
+const mockLogger = vi.hoisted(() => ({
+	info: vi.fn(),
+	warn: vi.fn(),
+	error: vi.fn(),
+}));
+
+const mockRender = vi.hoisted(() => vi.fn());
+
+const mockCostAlertEmail = vi.hoisted(() => vi.fn(() => null));
+
+const mockEmailsSend = vi.hoisted(() => vi.fn());
+
 vi.mock("~/env", () => ({
-	env: {
-		RESEND_API_KEY: "re_test_key_123",
-		RESEND_FROM_EMAIL: "test@example.com",
-	},
+	env: mockEnv,
 }));
 
 vi.mock("~/lib/logger", () => ({
-	logger: {
-		info: vi.fn(),
-		warn: vi.fn(),
-		error: vi.fn(),
-	},
+	logger: mockLogger,
 }));
 
 vi.mock("@react-email/components", () => ({
-	render: vi.fn(),
+	render: mockRender,
 }));
 
 vi.mock("../templates/CostAlertEmail", () => ({
-	default: vi.fn(() => null),
+	default: mockCostAlertEmail,
 }));
-
-const mockEmailsSend = vi.fn();
 
 vi.mock("resend", () => {
 	return {
@@ -53,7 +61,7 @@ import {
 describe("Resend Email Client", () => {
 	beforeEach(() => {
 		mockEmailsSend.mockReset();
-		vi.mocked(render).mockResolvedValue("<html>Test Email</html>");
+		mockRender.mockResolvedValue("<html>Test Email</html>");
 	});
 
 	afterEach(() => {
@@ -73,18 +81,16 @@ describe("Resend Email Client", () => {
 	describe("sendCostAlertEmail", () => {
 		it("should skip sending when RESEND_API_KEY is not configured", async () => {
 			// Temporarily remove API key
-			const originalKey = env.RESEND_API_KEY;
-			(env as { RESEND_API_KEY: string | undefined }).RESEND_API_KEY =
-				undefined;
+			const originalKey = mockEnv.RESEND_API_KEY;
+			mockEnv.RESEND_API_KEY = undefined as unknown as string;
 
 			await sendCostAlertEmail(mockParams);
 
-			expect(render).not.toHaveBeenCalled();
+			expect(mockRender).not.toHaveBeenCalled();
 			expect(mockEmailsSend).not.toHaveBeenCalled();
 
 			// Restore API key
-			(env as { RESEND_API_KEY: string | undefined }).RESEND_API_KEY =
-				originalKey;
+			mockEnv.RESEND_API_KEY = originalKey;
 		});
 
 		it("should render email template with correct props", async () => {
@@ -95,8 +101,8 @@ describe("Resend Email Client", () => {
 
 			await sendCostAlertEmail(mockParams);
 
-			expect(render).toHaveBeenCalledTimes(1);
-			const renderCall = vi.mocked(render).mock.calls[0];
+			expect(mockRender).toHaveBeenCalledTimes(1);
+			const renderCall = mockRender.mock.calls[0];
 			expect(renderCall?.[0]).toBeDefined();
 		});
 
@@ -118,9 +124,8 @@ describe("Resend Email Client", () => {
 		});
 
 		it("should use default from email if RESEND_FROM_EMAIL not configured", async () => {
-			const originalFromEmail = env.RESEND_FROM_EMAIL;
-			(env as { RESEND_FROM_EMAIL: string | undefined }).RESEND_FROM_EMAIL =
-				undefined;
+			const originalFromEmail = mockEnv.RESEND_FROM_EMAIL;
+			mockEnv.RESEND_FROM_EMAIL = undefined as unknown as string;
 
 			mockEmailsSend.mockResolvedValue({
 				data: { id: "email-123" },
@@ -137,8 +142,7 @@ describe("Resend Email Client", () => {
 			});
 
 			// Restore
-			(env as { RESEND_FROM_EMAIL: string | undefined }).RESEND_FROM_EMAIL =
-				originalFromEmail;
+			mockEnv.RESEND_FROM_EMAIL = originalFromEmail;
 		});
 
 		it("should throw error when Resend API returns error", async () => {
@@ -282,8 +286,6 @@ describe("Resend Email Client", () => {
 		});
 
 		it("should log successful email send with email ID", async () => {
-			const { logger } = await import("~/lib/logger");
-
 			mockEmailsSend.mockResolvedValue({
 				data: { id: "email-abc123" },
 				error: null,
@@ -291,7 +293,7 @@ describe("Resend Email Client", () => {
 
 			await sendCostAlertEmail(mockParams);
 
-			expect(logger.info).toHaveBeenCalledWith(
+			expect(mockLogger.info).toHaveBeenCalledWith(
 				{
 					projectName: "Test Project",
 					to: "user@example.com",
@@ -332,8 +334,6 @@ describe("Resend Email Client", () => {
 		});
 
 		it("should log error after all retries exhausted", async () => {
-			const { logger } = await import("~/lib/logger");
-
 			mockEmailsSend.mockResolvedValue({
 				data: null,
 				error: { message: "Persistent error" },
@@ -356,7 +356,7 @@ describe("Resend Email Client", () => {
 			// Wait for completion
 			await testPromise;
 
-			expect(logger.error).toHaveBeenCalledWith(
+			expect(mockLogger.error).toHaveBeenCalledWith(
 				{ error: "Resend API error: Persistent error" },
 				"Email send failed after all retries",
 			);
