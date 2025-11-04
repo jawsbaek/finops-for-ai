@@ -30,10 +30,11 @@ describe("fetchOpenAIOrganizationId", () => {
 		global.fetch = vi.fn().mockResolvedValue({
 			ok: false,
 			status: 401,
+			text: async () => "Unauthorized",
 		});
 
 		await expect(fetchOpenAIOrganizationId("invalid-key")).rejects.toThrow(
-			"Failed to fetch organization from OpenAI API",
+			"Unable to fetch organization",
 		);
 	});
 
