@@ -19,6 +19,7 @@ import {
 	encryptApiKey,
 	validateApiKey,
 } from "~/lib/services/encryption/api-key-manager";
+import { fetchOpenAIOrganizationId } from "~/lib/services/providers/openai-validator";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { db } from "~/server/db";
 
@@ -747,18 +748,25 @@ export const teamRouter = createTRPCRouter({
 	 * Only team owners and admins can register Admin API keys
 	 * Uses KMS envelope encryption to securely store the key
 	 */
+	/**
+	 * Register Admin API Key for a team
+	 * Supports multiple providers and organizations per team
+	 */
 	registerAdminApiKey: protectedProcedure
 		.input(
 			z.object({
 				teamId: z.string(),
+				provider: z.enum(["openai", "anthropic", "aws", "azure"]),
 				apiKey: z.string().min(20),
+				organizationId: z.string().optional(),
+				displayName: z.string().max(100).optional(),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
 			const userId = ctx.session.user.id;
 
 			// 1. Verify team membership (owner/admin only)
-			const teamMember = await db.teamMember.findUnique({
+			const teamMember = await ctx.db.teamMember.findUnique({
 				where: {
 					teamId_userId: {
 						teamId: input.teamId,
@@ -775,47 +783,63 @@ export const teamRouter = createTRPCRouter({
 			}
 
 			// 2. Validate API key format
-			if (!validateApiKey(input.apiKey, "openai")) {
+			if (!validateApiKey(input.apiKey, input.provider)) {
 				throw new TRPCError({
 					code: "BAD_REQUEST",
-					message: "Invalid OpenAI Admin API key format",
+					message: `Invalid ${input.provider} API key format`,
 				});
 			}
 
-			// 3. Encrypt API key with KMS
-			const { ciphertext, encryptedDataKey, iv } = await encryptApiKey(
-				input.apiKey,
-			);
+			// 3. Extract organization ID (auto-detect for OpenAI if not provided)
+			let organizationId = input.organizationId;
+			if (input.provider === "openai" && !organizationId) {
+				organizationId = await fetchOpenAIOrganizationId(input.apiKey);
+			}
 
-			// 4. Upsert Admin Key (update if exists, create if not)
-			const last4 = input.apiKey.slice(-4);
-
-			const adminKey = await db.organizationApiKey.upsert({
-				where: { teamId: input.teamId },
-				update: {
-					provider: "openai",
-					encryptedKey: ciphertext,
-					encryptedDataKey,
-					iv,
-					last4,
-					isActive: true,
-					keyType: "admin",
-					updatedAt: new Date(),
-				},
-				create: {
-					teamId: input.teamId,
-					provider: "openai",
-					encryptedKey: ciphertext,
-					encryptedDataKey,
-					iv,
-					last4,
-					isActive: true,
-					keyType: "admin",
+			// 4. Check for duplicate (same team + provider + org)
+			const existing = await ctx.db.organizationApiKey.findUnique({
+				where: {
+					unique_team_provider_org: {
+						teamId: input.teamId,
+						provider: input.provider,
+						organizationId: organizationId ?? (null as unknown as string),
+					},
 				},
 			});
 
-			// 5. Create audit log
-			await db.auditLog.create({
+			if (existing) {
+				throw new TRPCError({
+					code: "CONFLICT",
+					message: `An API key for ${input.provider}${organizationId ? ` (${organizationId})` : ""} already exists`,
+				});
+			}
+
+			// 5. Encrypt API key with KMS
+			const { ciphertext, encryptedDataKey, iv } = await encryptApiKey(
+				input.apiKey,
+			);
+			const last4 = input.apiKey.slice(-4);
+
+			// 6. Store Admin Key
+			const adminKey = await ctx.db.organizationApiKey.create({
+				data: {
+					teamId: input.teamId,
+					provider: input.provider,
+					organizationId,
+					encryptedKey: ciphertext,
+					encryptedDataKey,
+					iv,
+					last4,
+					isActive: true,
+					keyType: "admin",
+					displayName:
+						input.displayName ??
+						`${input.provider}${organizationId ? ` - ${organizationId}` : ""}`,
+				},
+			});
+
+			// 7. Audit log
+			await ctx.db.auditLog.create({
 				data: {
 					userId,
 					actionType: "admin_api_key_registered",
@@ -823,6 +847,8 @@ export const teamRouter = createTRPCRouter({
 					resourceId: adminKey.id,
 					metadata: {
 						teamId: input.teamId,
+						provider: input.provider,
+						organizationId,
 						last4,
 					},
 				},
@@ -831,9 +857,10 @@ export const teamRouter = createTRPCRouter({
 			logger.info(
 				{
 					teamId: input.teamId,
+					provider: input.provider,
+					organizationId,
 					adminKeyId: adminKey.id,
 					userId,
-					last4,
 				},
 				"Admin API key registered successfully",
 			);
@@ -841,14 +868,18 @@ export const teamRouter = createTRPCRouter({
 			return {
 				success: true,
 				keyId: adminKey.id,
+				provider: input.provider,
+				organizationId,
 				last4: adminKey.last4,
+				displayName: adminKey.displayName,
 			};
 		}),
 
 	/**
-	 * Get Admin API Key status for a team
+	 * Get Admin API Key status for a team (Legacy - returns first key)
 	 *
 	 * Any team member can view the status (but not the actual key)
+	 * @deprecated Use getAdminApiKeys instead for multi-org support
 	 */
 	getAdminApiKeyStatus: protectedProcedure
 		.input(z.object({ teamId: z.string() }))
@@ -872,19 +903,69 @@ export const teamRouter = createTRPCRouter({
 				});
 			}
 
-			// Get Admin API Key status (never return encrypted key)
-			const adminKey = await db.organizationApiKey.findUnique({
+			// Get first Admin API Key (for backward compatibility)
+			const adminKeys = await db.organizationApiKey.findMany({
 				where: { teamId: input.teamId },
 				select: {
 					id: true,
+					provider: true,
+					organizationId: true,
+					displayName: true,
 					last4: true,
 					isActive: true,
 					keyType: true,
 					createdAt: true,
 					updatedAt: true,
 				},
+				take: 1,
 			});
 
-			return adminKey;
+			return adminKeys[0] ?? null;
+		}),
+
+	/**
+	 * Get all Admin API Keys for a team
+	 * Returns array of keys (supports multi-org)
+	 */
+	getAdminApiKeys: protectedProcedure
+		.input(z.object({ teamId: z.string() }))
+		.query(async ({ ctx, input }) => {
+			const userId = ctx.session.user.id;
+
+			// Verify team membership
+			const teamMember = await ctx.db.teamMember.findUnique({
+				where: {
+					teamId_userId: {
+						teamId: input.teamId,
+						userId,
+					},
+				},
+			});
+
+			if (!teamMember) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You are not a member of this team",
+				});
+			}
+
+			// Get all Admin API Keys (never return encrypted key)
+			const adminKeys = await ctx.db.organizationApiKey.findMany({
+				where: { teamId: input.teamId },
+				select: {
+					id: true,
+					provider: true,
+					organizationId: true,
+					displayName: true,
+					last4: true,
+					isActive: true,
+					keyType: true,
+					createdAt: true,
+					updatedAt: true,
+				},
+				orderBy: [{ provider: "asc" }, { createdAt: "desc" }],
+			});
+
+			return adminKeys;
 		}),
 });
