@@ -152,6 +152,7 @@ model ProjectMember {
 
   @@unique([projectId, userId])
   @@index([userId])
+  @@index([projectId, userId]) // Compound index for join queries
   @@map("project_members")
 }
 
@@ -185,6 +186,7 @@ model ApiKey {
   @@index([projectId])
   @@index([provider])
   @@index([last4]) // For quick lookup and display
+  @@index([projectId, isActive]) // Compound index for filtering active keys
   @@map("api_keys")
 }
 
@@ -269,6 +271,8 @@ model AuditLog {
 
   @@index([userId, createdAt])
   @@index([resourceType, resourceId])
+  @@index([actionType]) // Index for filtering by action type
+  @@index([createdAt]) // Index for time-based queries
   @@map("audit_logs")
 }
 

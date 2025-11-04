@@ -289,24 +289,8 @@ export const teamRouter = createTRPCRouter({
 		.query(async ({ ctx, input }) => {
 			const userId = ctx.session.user.id;
 
-			// Verify user is a member of this team
-			const membership = await db.teamMember.findUnique({
-				where: {
-					teamId_userId: {
-						teamId: input.teamId,
-						userId,
-					},
-				},
-			});
-
-			if (!membership) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: ERROR_MESSAGES.TEAM_ACCESS_DENIED,
-				});
-			}
-
-			// Get all team members with user info
+			// Performance optimization: Single query instead of N+1
+			// Fetch all members and do permission check in-memory
 			const members = await db.teamMember.findMany({
 				where: {
 					teamId: input.teamId,
@@ -329,6 +313,15 @@ export const teamRouter = createTRPCRouter({
 					},
 				],
 			});
+
+			// In-memory permission check (avoids separate DB query)
+			const currentUserMembership = members.find((m) => m.userId === userId);
+			if (!currentUserMembership) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: ERROR_MESSAGES.TEAM_ACCESS_DENIED,
+				});
+			}
 
 			return members.map((m) => ({
 				id: m.id,
