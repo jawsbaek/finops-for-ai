@@ -1,6 +1,6 @@
 # Story 1.11: 보안 강화 - API 키 노출 방지 및 Rate Limiting
 
-**Status:** 📋 TODO
+**Status:** ✅ DONE
 
 **Priority:** 🔴 CRITICAL
 
