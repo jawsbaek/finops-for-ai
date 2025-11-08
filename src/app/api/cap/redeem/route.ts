@@ -7,9 +7,17 @@
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { logger } from "~/lib/logger";
 import { redeemCaptchaChallenge } from "~/server/api/captcha";
 import { rateLimits } from "~/server/api/ratelimit";
+
+const redeemRequestSchema = z.object({
+	token: z.string().min(1, "Token is required"),
+	solutions: z.array(z.array(z.number()), {
+		required_error: "Solutions are required",
+	}),
+});
 
 export async function POST(request: NextRequest) {
 	// Rate limiting: 100 requests/min per IP
@@ -24,19 +32,36 @@ export async function POST(request: NextRequest) {
 		);
 	}
 	try {
-		const body = (await request.json()) as {
-			token: string;
-			solutions: number[][];
-		};
-
-		const { token, solutions } = body;
-
-		if (!token || !solutions) {
+		// Parse and validate request body
+		let body: unknown;
+		try {
+			body = await request.json();
+		} catch (error) {
+			logger.warn({ error }, "Invalid JSON in CAPTCHA redeem request");
 			return NextResponse.json(
-				{ success: false, error: "Missing token or solutions" },
+				{ success: false, error: "Invalid JSON" },
 				{ status: 400 },
 			);
 		}
+
+		// Validate request schema
+		const parseResult = redeemRequestSchema.safeParse(body);
+		if (!parseResult.success) {
+			logger.warn(
+				{ errors: parseResult.error.flatten() },
+				"Invalid request schema for CAPTCHA redeem",
+			);
+			return NextResponse.json(
+				{
+					success: false,
+					error: "Invalid request format",
+					details: parseResult.error.flatten().fieldErrors,
+				},
+				{ status: 400 },
+			);
+		}
+
+		const { token, solutions } = parseResult.data;
 
 		const result = await redeemCaptchaChallenge(token, solutions);
 

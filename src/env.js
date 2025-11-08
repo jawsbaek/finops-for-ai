@@ -48,7 +48,22 @@ export const env = createEnv({
 		// Cap.js CAPTCHA
 		CAP_SECRET_KEY: z.string().min(32),
 		CAP_DIFFICULTY: z.coerce.number().int().positive().default(100000),
-		CAP_BYPASS: z.coerce.boolean().default(false),
+		CAP_BYPASS: z.coerce
+			.boolean()
+			.default(false)
+			.refine(
+				(bypass) => {
+					// SECURITY: CAP_BYPASS must be false in production
+					if (process.env.NODE_ENV === "production" && bypass) {
+						return false;
+					}
+					return true;
+				},
+				{
+					message:
+						"SECURITY ERROR: CAP_BYPASS must be false in production environment",
+				},
+			),
 	},
 
 	/**

@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock env before importing captcha module
+// Using vi.mock() for env module (CLAUDE.md exception: env validates on import)
 const mockEnv = vi.hoisted(() => ({
 	CAP_SECRET_KEY: "test-secret-key-32-chars-12345678",
 	CAP_DIFFICULTY: 100000,

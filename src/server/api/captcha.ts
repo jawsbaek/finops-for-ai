@@ -17,13 +17,8 @@ let capInstance: Cap | null = null;
 
 function getCapInstance(): Cap {
 	if (!capInstance) {
-		// Production safety check: CAP_BYPASS must be false in production
-		if (process.env.NODE_ENV === "production" && env.CAP_BYPASS) {
-			throw new Error(
-				"SECURITY ERROR: CAP_BYPASS must be false in production environment",
-			);
-		}
-
+		// Note: CAP_BYPASS production validation is now handled in src/env.js
+		// using Zod's refine() for build-time validation
 		capInstance = new Cap({
 			// Use file system state (default)
 			// Alternative: Implement custom storage with database hooks
@@ -101,7 +96,10 @@ export async function createCaptchaChallenge() {
 	const challenge = await cap.createChallenge({
 		challengeCount: 50, // Number of hashes to solve
 		challengeSize: 32, // Bytes per challenge
-		challengeDifficulty: Math.floor(env.CAP_DIFFICULTY / 2000), // Convert to difficulty level
+		// Convert CAP_DIFFICULTY (iterations) to Cap.js difficulty level
+		// Formula: difficulty = iterations / 2000
+		// Example: 100000 iterations → difficulty level 50
+		challengeDifficulty: Math.floor(env.CAP_DIFFICULTY / 2000),
 		expiresMs: 600000, // 10 minutes
 	});
 

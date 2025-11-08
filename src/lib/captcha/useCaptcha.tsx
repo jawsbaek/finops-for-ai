@@ -26,7 +26,7 @@
 "use client";
 
 import { Cap } from "@cap.js/widget";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslations } from "~/lib/i18n";
 
 interface UseCaptchaReturn {
@@ -70,15 +70,21 @@ export function useCaptcha(): UseCaptchaReturn {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
+	// Cache Cap instance to prevent memory leaks from multiple WebAssembly module loads
+	const capInstanceRef = useRef<Cap | null>(null);
+
 	const execute = useCallback(async (): Promise<string> => {
 		setIsLoading(true);
 		setError(null);
 
 		try {
-			// Create Cap instance with API endpoint
-			const cap = new Cap({
-				apiEndpoint: "/api/cap",
-			});
+			// Reuse existing Cap instance or create new one
+			if (!capInstanceRef.current) {
+				capInstanceRef.current = new Cap({
+					apiEndpoint: "/api/cap",
+				});
+			}
+			const cap = capInstanceRef.current;
 
 			// Execute proof-of-work
 			// This will:
