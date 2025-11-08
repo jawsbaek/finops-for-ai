@@ -151,13 +151,13 @@ export async function createCaptchaChallenge() {
  */
 export async function redeemCaptchaChallenge(
 	token: string,
-	solutions: number[] | number[][],
+	solutions: number[],
 ) {
 	const cap = getCapInstance();
 
 	const result = await cap.redeemChallenge({
 		token,
-		solutions: solutions as number[], // Cap.js expects number[]
+		solutions,
 	});
 
 	return result;

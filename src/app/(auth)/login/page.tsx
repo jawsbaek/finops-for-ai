@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { useCaptcha } from "~/lib/captcha/useCaptcha";
+import { CapWidget } from "~/components/wed/cap-widget";
 import { useTranslations } from "~/lib/i18n";
 
 const loginSchema = z.object({
@@ -24,12 +24,11 @@ export default function LoginPage() {
 		general?: string;
 	}>({});
 	const [isLoading, setIsLoading] = useState(false);
-	const { execute: executeCaptcha, isLoading: captchaLoading } = useCaptcha();
+	const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setErrors({});
-		setIsLoading(true);
 
 		// Validate inputs
 		const result = loginSchema.safeParse({ email, password });
@@ -39,14 +38,21 @@ export default function LoginPage() {
 				email: fieldErrors.email?.[0],
 				password: fieldErrors.password?.[0],
 			});
-			setIsLoading(false);
 			return;
 		}
 
-		try {
-			// Execute CAPTCHA proof-of-work
-			const captchaToken = await executeCaptcha();
+		// Check if CAPTCHA is solved
+		if (!captchaToken) {
+			setErrors({ general: t.captcha.captchaRequiredDescription });
+			toast.error(t.captcha.captchaRequired, {
+				description: t.captcha.captchaRequiredDescription,
+			});
+			return;
+		}
 
+		setIsLoading(true);
+
+		try {
 			const response = await signIn("credentials", {
 				email,
 				password,
@@ -60,16 +66,15 @@ export default function LoginPage() {
 					description: "Invalid email or password",
 				});
 				setIsLoading(false);
+				// Reset CAPTCHA on error
+				setCaptchaToken(null);
 				return;
 			}
 
 			// Redirect to dashboard on success
-			// Note: isLoading remains true during navigation to prevent duplicate clicks
 			toast.success(t.captcha.loginSuccess);
 			router.push("/dashboard");
 		} catch (error) {
-			// Client-side error logging (console is acceptable in client components)
-			// Server-side errors are logged via structured logger
 			if (process.env.NODE_ENV === "development") {
 				console.error("Login error:", error);
 			}
@@ -80,10 +85,10 @@ export default function LoginPage() {
 				description: errorMsg,
 			});
 			setIsLoading(false);
+			// Reset CAPTCHA on error
+			setCaptchaToken(null);
 		}
 	};
-
-	const isFormLoading = isLoading || captchaLoading;
 
 	return (
 		<div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
@@ -153,17 +158,41 @@ export default function LoginPage() {
 						</div>
 					</div>
 
+					{/* CAPTCHA Widget */}
+					<div className="flex justify-center">
+						<CapWidget
+							endpoint="/api/cap/"
+							onSolve={(token) => {
+								setCaptchaToken(token);
+								toast.success(t.captcha.verified, {
+									description: t.captcha.verifiedDescription,
+								});
+							}}
+							onError={(message) => {
+								setCaptchaToken(null);
+								toast.error(t.captcha.captchaError, {
+									description: message,
+								});
+							}}
+							onReset={() => {
+								setCaptchaToken(null);
+							}}
+							locale={{
+								initial: t.captcha.initial,
+								verifying: t.captcha.verifying,
+								solved: t.captcha.solved,
+								error: t.captcha.error,
+							}}
+						/>
+					</div>
+
 					<div>
 						<button
 							type="submit"
-							disabled={isFormLoading}
+							disabled={isLoading || !captchaToken}
 							className="group relative flex w-full justify-center rounded-md bg-primary px-3 py-2 font-semibold text-primary-foreground text-sm hover:bg-primary-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 						>
-							{captchaLoading
-								? t.captcha.verifying
-								: isLoading
-									? t.captcha.signingIn
-									: "Sign in"}
+							{isLoading ? t.captcha.signingIn : "Sign in"}
 						</button>
 					</div>
 				</form>
