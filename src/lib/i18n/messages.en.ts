@@ -143,10 +143,21 @@ export const messages: Messages = {
 	},
 
 	captcha: {
-		verifying: "Verifying security...",
+		// CapWidget labels
+		initial: "I'm not a robot",
+		verifying: "Verifying...",
+		solved: "Verified",
+		error: "Verification failed, please retry",
+		// Verification states
 		verificationFailed: "Security verification failed. Please try again.",
 		verificationError: "An error occurred during CAPTCHA verification.",
 		tokenRequired: "CAPTCHA token is required",
+		verified: "CAPTCHA verified",
+		verifiedDescription: "You can now sign in/sign up",
+		captchaRequired: "CAPTCHA Required",
+		captchaRequiredDescription: "Please complete the CAPTCHA verification",
+		captchaError: "CAPTCHA Error",
+		// Auth flow messages
 		signingIn: "Signing in...",
 		creatingAccount: "Creating account...",
 		loginFailed: "Login failed",
