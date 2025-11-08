@@ -19,6 +19,23 @@ vi.mock("~/env", () => ({
 	env: mockEnv,
 }));
 
+// Mock database storage to prevent actual database calls during tests
+const mockCaptchaTokenUpsert = vi.hoisted(() => vi.fn());
+const mockCaptchaTokenFindUnique = vi.hoisted(() => vi.fn());
+const mockCaptchaTokenDelete = vi.hoisted(() => vi.fn());
+const mockCaptchaTokenDeleteMany = vi.hoisted(() => vi.fn());
+
+vi.mock("~/server/db", () => ({
+	db: {
+		captchaToken: {
+			upsert: mockCaptchaTokenUpsert,
+			findUnique: mockCaptchaTokenFindUnique,
+			delete: mockCaptchaTokenDelete,
+			deleteMany: mockCaptchaTokenDeleteMany,
+		},
+	},
+}));
+
 import * as loggerModule from "~/lib/logger";
 import * as captchaModule from "../captcha";
 
@@ -28,6 +45,7 @@ describe("verifyCaptchaToken", () => {
 	let errorSpy: ReturnType<typeof vi.fn>;
 
 	beforeEach(() => {
+		// Setup logger spies
 		warnSpy = vi
 			.spyOn(loggerModule.logger, "warn")
 			.mockImplementation(() => {}) as ReturnType<typeof vi.fn>;
@@ -37,9 +55,24 @@ describe("verifyCaptchaToken", () => {
 		errorSpy = vi
 			.spyOn(loggerModule.logger, "error")
 			.mockImplementation(() => {}) as ReturnType<typeof vi.fn>;
+
+		// Setup database mock implementations
+		mockCaptchaTokenUpsert.mockResolvedValue({
+			id: "test-id",
+			token: "test-token",
+			type: "challenge",
+			data: {},
+			expiresAt: new Date(Date.now() + 600000),
+			createdAt: new Date(),
+		});
+
+		mockCaptchaTokenFindUnique.mockResolvedValue(null);
+		mockCaptchaTokenDelete.mockResolvedValue({});
+		mockCaptchaTokenDeleteMany.mockResolvedValue({ count: 0 });
 	});
 
 	afterEach(() => {
+		vi.clearAllMocks();
 		vi.restoreAllMocks();
 	});
 
@@ -105,6 +138,27 @@ describe("verifyCaptchaToken", () => {
 });
 
 describe("createCaptchaChallenge", () => {
+	beforeEach(() => {
+		// Setup database mock implementations
+		mockCaptchaTokenUpsert.mockResolvedValue({
+			id: "test-id",
+			token: "test-token",
+			type: "challenge",
+			data: {},
+			expiresAt: new Date(Date.now() + 600000),
+			createdAt: new Date(),
+		});
+
+		mockCaptchaTokenFindUnique.mockResolvedValue(null);
+		mockCaptchaTokenDelete.mockResolvedValue({});
+		mockCaptchaTokenDeleteMany.mockResolvedValue({ count: 0 });
+	});
+
+	afterEach(() => {
+		vi.clearAllMocks();
+		vi.restoreAllMocks();
+	});
+
 	it("should create a challenge with token", async () => {
 		const challenge = await captchaModule.createCaptchaChallenge();
 
@@ -123,6 +177,37 @@ describe("createCaptchaChallenge", () => {
 });
 
 describe("redeemCaptchaChallenge", () => {
+	beforeEach(() => {
+		// Setup database mock implementations
+		mockCaptchaTokenUpsert.mockResolvedValue({
+			id: "test-id",
+			token: "test-token",
+			type: "solution",
+			data: { expiresAt: Date.now() + 600000 },
+			expiresAt: new Date(Date.now() + 600000),
+			createdAt: new Date(),
+		});
+
+		mockCaptchaTokenFindUnique.mockResolvedValue({
+			id: "test-id",
+			token: "test-token",
+			type: "challenge",
+			data: {
+				challenge: "test-challenge-data",
+			},
+			expiresAt: new Date(Date.now() + 600000),
+			createdAt: new Date(),
+		});
+
+		mockCaptchaTokenDelete.mockResolvedValue({});
+		mockCaptchaTokenDeleteMany.mockResolvedValue({ count: 0 });
+	});
+
+	afterEach(() => {
+		vi.clearAllMocks();
+		vi.restoreAllMocks();
+	});
+
 	it("should handle redeem request", async () => {
 		const challenge = await captchaModule.createCaptchaChallenge();
 		const token = challenge.token ?? "";
