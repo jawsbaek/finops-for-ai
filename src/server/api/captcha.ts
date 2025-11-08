@@ -56,7 +56,16 @@ export async function verifyCaptchaToken(token: string): Promise<boolean> {
 
 	// Validate token format
 	if (!token || typeof token !== "string" || token.length === 0) {
-		logger.warn({ token }, "Invalid CAPTCHA token format");
+		logger.warn(
+			{
+				tokenType: typeof token,
+				tokenPrefix:
+					typeof token === "string" && token.length > 0
+						? token.slice(0, 10)
+						: "invalid",
+			},
+			"Invalid CAPTCHA token format",
+		);
 		return false;
 	}
 

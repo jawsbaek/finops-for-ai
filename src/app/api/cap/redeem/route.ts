@@ -28,13 +28,25 @@ const redeemRequestSchema = z.object({
 export async function POST(request: NextRequest) {
 	// Rate limiting: 100 requests/min per IP
 	const ip = request.headers.get("x-forwarded-for") ?? "anonymous";
-	const { success } = await rateLimits.normal.limit(ip);
+	const { success, limit, remaining, reset } =
+		await rateLimits.normal.limit(ip);
+
+	// Add rate limit headers for better client experience
+	const headers = new Headers({
+		"X-RateLimit-Limit": limit.toString(),
+		"X-RateLimit-Remaining": remaining.toString(),
+		"X-RateLimit-Reset": new Date(reset).toISOString(),
+	});
 
 	if (!success) {
+		// Add Retry-After header when rate limited
+		const retryAfter = Math.ceil((reset - Date.now()) / 1000);
+		headers.set("Retry-After", retryAfter.toString());
+
 		logger.warn({ ip }, "Rate limit exceeded for CAPTCHA redeem");
 		return NextResponse.json(
 			{ success: false, error: "Rate limit exceeded. Please try again later." },
-			{ status: 429 },
+			{ status: 429, headers },
 		);
 	}
 	try {
@@ -46,7 +58,7 @@ export async function POST(request: NextRequest) {
 			logger.warn({ error }, "Invalid JSON in CAPTCHA redeem request");
 			return NextResponse.json(
 				{ success: false, error: "Invalid JSON" },
-				{ status: 400 },
+				{ status: 400, headers },
 			);
 		}
 
@@ -63,7 +75,7 @@ export async function POST(request: NextRequest) {
 					error: "Invalid request format",
 					details: parseResult.error.flatten().fieldErrors,
 				},
-				{ status: 400 },
+				{ status: 400, headers },
 			);
 		}
 
@@ -87,7 +99,7 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		return NextResponse.json(result);
+		return NextResponse.json(result, { headers });
 	} catch (error) {
 		logger.error(
 			{
@@ -98,7 +110,7 @@ export async function POST(request: NextRequest) {
 
 		return NextResponse.json(
 			{ success: false, error: "Failed to redeem challenge" },
-			{ status: 500 },
+			{ status: 500, headers },
 		);
 	}
 }

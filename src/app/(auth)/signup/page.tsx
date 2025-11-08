@@ -28,11 +28,13 @@ export default function SignupPage() {
 		general?: string;
 	}>({});
 	const { execute: executeCaptcha, isLoading: captchaLoading } = useCaptcha();
+	const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(false);
 
 	const signupMutation = api.auth.signup.useMutation({
 		onSuccess: async () => {
 			// Auto-login after successful signup
 			// Need to execute CAPTCHA again for login (tokens are single-use)
+			setIsAutoLoggingIn(true);
 			try {
 				const captchaToken = await executeCaptcha();
 				const response = await signIn("credentials", {
@@ -64,6 +66,8 @@ export default function SignupPage() {
 				toast.error(t.captcha.autoLoginFailed, {
 					description: t.captcha.accountCreatedButLoginFailed,
 				});
+			} finally {
+				setIsAutoLoggingIn(false);
 			}
 		},
 		onError: (error) => {
@@ -106,7 +110,8 @@ export default function SignupPage() {
 		}
 	};
 
-	const isFormLoading = signupMutation.isPending || captchaLoading;
+	const isFormLoading =
+		signupMutation.isPending || captchaLoading || isAutoLoggingIn;
 
 	return (
 		<div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
