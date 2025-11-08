@@ -43,7 +43,7 @@ export default function SignupPage() {
 				const response = await signIn("credentials", {
 					email,
 					password,
-					captchaToken: captchaToken, // Reuse the token from signup
+					captchaToken, // Reuse the token from signup
 					redirect: false,
 				});
 

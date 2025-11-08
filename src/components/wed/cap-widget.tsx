@@ -53,6 +53,32 @@ interface CapWidgetProps
 	onProgress?: (progress: number) => void;
 }
 
+/**
+ * Cap.js CAPTCHA widget component
+ *
+ * Renders a proof-of-work CAPTCHA widget and handles verification events.
+ * Uses the @cap.js/widget web component for client-side challenge solving.
+ *
+ * @example
+ * ```tsx
+ * <CapWidget
+ *   endpoint="/api/cap/"
+ *   onSolve={(token) => {
+ *     setCaptchaToken(token);
+ *     toast.success("Verified!");
+ *   }}
+ *   onError={(message) => {
+ *     console.error("CAPTCHA error:", message);
+ *   }}
+ *   locale={{
+ *     initial: "I'm not a robot",
+ *     verifying: "Verifying...",
+ *     solved: "Verified",
+ *     error: "Verification failed",
+ *   }}
+ * />
+ * ```
+ */
 const CapWidget = forwardRef<HTMLDivElement, CapWidgetProps>(
 	(
 		{
@@ -80,7 +106,6 @@ const CapWidget = forwardRef<HTMLDivElement, CapWidgetProps>(
 
 		const handleSolve = useCallback(
 			(e: Event) => {
-				console.log("handleSolve", e);
 				const customEvent = e as CustomEvent<{ token?: string }>;
 				const token = customEvent.detail?.token;
 				if (!token) return;
@@ -116,7 +141,6 @@ const CapWidget = forwardRef<HTMLDivElement, CapWidgetProps>(
 			let mounted = true;
 
 			const loadWidget = async () => {
-				// @ts-ignore
 				await import("@cap.js/widget");
 
 				if (mounted) {
@@ -124,7 +148,7 @@ const CapWidget = forwardRef<HTMLDivElement, CapWidgetProps>(
 				}
 			};
 
-			// 只在客户端执行
+			// Only execute on client-side
 			if (typeof window !== "undefined") {
 				loadWidget();
 			}
