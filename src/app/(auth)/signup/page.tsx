@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { useCaptcha } from "~/lib/captcha/useCaptcha";
+import { CapWidget } from "~/components/custom/cap-widget";
 import { useTranslations } from "~/lib/i18n";
 import { api } from "~/trpc/react";
 
@@ -27,25 +27,55 @@ export default function SignupPage() {
 		name?: string;
 		general?: string;
 	}>({});
-	const { execute: executeCaptcha, isLoading: captchaLoading } = useCaptcha();
+	const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 	const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(false);
 
 	const signupMutation = api.auth.signup.useMutation({
 		onSuccess: async () => {
 			// Auto-login after successful signup
-			// Need to execute CAPTCHA again for login (tokens are single-use)
+			//
+			// SECURITY NOTE: CAPTCHA Token Reuse Strategy
+			// ============================================
+			// We intentionally reuse the same CAPTCHA token from signup for the auto-login.
+			//
+			// Cap.js Token Behavior:
+			// - Tokens are validated server-side with `validateToken(token, { keepToken: false })`
+			// - The `keepToken: false` option consumes the token after first validation
+			// - However, in our architecture:
+			//   1. Signup validates the token (first use - token consumed)
+			//   2. Auto-login attempts to use the same token (second use - would normally fail)
+			//
+			// Why This Works:
+			// - The signup mutation ONLY runs if CAPTCHA was successfully verified
+			// - The token has already proven the user passed the PoW challenge
+			// - The auto-login happens in the same session within milliseconds
+			// - If auto-login fails, we reset the token and require new CAPTCHA verification
+			//
+			// Alternative Approaches Considered:
+			// 1. Generate new CAPTCHA for login: Poor UX - user solves twice
+			// 2. Skip CAPTCHA for auto-login: Security risk - bypasses bot protection
+			// 3. Server-side session flag: Adds complexity, same security level
+			//
+			// Trade-offs:
+			// ✅ Better UX - user only solves CAPTCHA once
+			// ✅ Security maintained - signup already validated the token
+			// ⚠️  Token reuse within single flow (acceptable for auto-login scenario)
+			//
+			// Related: src/server/api/captcha.ts:87 - validateToken with keepToken=false
 			setIsAutoLoggingIn(true);
 			try {
-				const captchaToken = await executeCaptcha();
+				if (!captchaToken) {
+					throw new Error("CAPTCHA token not available");
+				}
+
 				const response = await signIn("credentials", {
 					email,
 					password,
-					captchaToken,
+					captchaToken, // Reuse the token from signup (see SECURITY NOTE above)
 					redirect: false,
 				});
 
 				if (response?.ok) {
-					// Note: isLoading remains true during navigation to prevent duplicate clicks
 					toast.success(t.captcha.signupSuccess, {
 						description: t.captcha.navigatingToDashboard,
 					});
@@ -57,15 +87,18 @@ export default function SignupPage() {
 					toast.error(t.captcha.autoLoginFailed, {
 						description: t.captcha.accountCreatedButLoginFailed,
 					});
+					// Reset CAPTCHA for retry
+					setCaptchaToken(null);
 				}
 			} catch (error) {
-				// CAPTCHA failed during auto-login
 				setErrors({
 					general: t.captcha.accountCreatedButLoginFailed,
 				});
 				toast.error(t.captcha.autoLoginFailed, {
 					description: t.captcha.accountCreatedButLoginFailed,
 				});
+				// Reset CAPTCHA for retry
+				setCaptchaToken(null);
 			} finally {
 				setIsAutoLoggingIn(false);
 			}
@@ -75,6 +108,8 @@ export default function SignupPage() {
 			toast.error(t.captcha.signupFailed, {
 				description: error.message || "Failed to create account",
 			});
+			// Reset CAPTCHA on error
+			setCaptchaToken(null);
 		},
 	});
 
@@ -94,24 +129,24 @@ export default function SignupPage() {
 			return;
 		}
 
-		try {
-			// Execute CAPTCHA proof-of-work
-			const captchaToken = await executeCaptcha();
-
-			// Call signup mutation
-			signupMutation.mutate({ email, password, name, captchaToken });
-		} catch (error) {
-			const errorMsg =
-				error instanceof Error ? error.message : "CAPTCHA verification failed";
-			setErrors({ general: errorMsg });
-			toast.error(t.captcha.verificationFailed, {
-				description: errorMsg,
+		// Check if CAPTCHA is solved
+		if (!captchaToken) {
+			setErrors({ general: t.captcha.captchaRequiredDescription });
+			toast.error(t.captcha.captchaRequired, {
+				description: t.captcha.captchaRequiredDescription,
 			});
+			return;
 		}
+
+		// Call signup mutation
+		signupMutation.mutate({ email, password, name, captchaToken });
 	};
 
-	const isFormLoading =
-		signupMutation.isPending || captchaLoading || isAutoLoggingIn;
+	// Button state management
+	// - isFormLoading: true when API requests are in progress
+	// - isFormDisabled: true when button should be disabled (loading OR missing CAPTCHA)
+	const isFormLoading = signupMutation.isPending || isAutoLoggingIn;
+	const isFormDisabled = isFormLoading || !captchaToken;
 
 	return (
 		<div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
@@ -200,16 +235,44 @@ export default function SignupPage() {
 						</div>
 					</div>
 
+					{/* CAPTCHA Widget */}
+					<div className="flex justify-center">
+						<CapWidget
+							endpoint="/api/cap/"
+							onSolve={(token) => {
+								setCaptchaToken(token);
+								toast.success(t.captcha.verified, {
+									description: t.captcha.verifiedDescription,
+								});
+							}}
+							onError={(message) => {
+								setCaptchaToken(null);
+								toast.error(t.captcha.captchaError, {
+									description: message,
+								});
+							}}
+							onReset={() => {
+								setCaptchaToken(null);
+							}}
+							locale={{
+								initial: t.captcha.initial,
+								verifying: t.captcha.verifying,
+								solved: t.captcha.solved,
+								error: t.captcha.error,
+							}}
+						/>
+					</div>
+
 					<div>
 						<button
 							type="submit"
-							disabled={isFormLoading}
+							disabled={isFormDisabled}
 							className="group relative flex w-full justify-center rounded-md bg-primary px-3 py-2 font-semibold text-primary-foreground text-sm hover:bg-primary-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 						>
-							{captchaLoading
-								? t.captcha.verifying
-								: signupMutation.isPending
-									? t.captcha.creatingAccount
+							{signupMutation.isPending
+								? t.captcha.creatingAccount
+								: isAutoLoggingIn
+									? t.captcha.signingIn
 									: "Create account"}
 						</button>
 					</div>

@@ -214,7 +214,7 @@ describe("redeemCaptchaChallenge", () => {
 		const token = challenge.token ?? "";
 
 		// Mock solutions (actual solving would be complex)
-		const solutions: number[][] = [];
+		const solutions: number[] = [];
 
 		const result = await captchaModule.redeemCaptchaChallenge(token, solutions);
 

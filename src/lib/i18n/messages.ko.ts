@@ -98,10 +98,21 @@ export const messages = {
 
 	// CAPTCHA messages
 	captcha: {
-		verifying: "보안 검증 중...",
+		// CapWidget labels
+		initial: "저는 로봇이 아닙니다",
+		verifying: "검증 중...",
+		solved: "검증 완료",
+		error: "검증 실패, 다시 시도해주세요",
+		// Verification states
 		verificationFailed: "보안 검증에 실패했습니다. 다시 시도해주세요.",
 		verificationError: "CAPTCHA 검증 중 오류가 발생했습니다.",
 		tokenRequired: "CAPTCHA 토큰이 필요합니다",
+		verified: "CAPTCHA 인증 완료",
+		verifiedDescription: "이제 로그인/가입할 수 있습니다",
+		captchaRequired: "CAPTCHA 필요",
+		captchaRequiredDescription: "CAPTCHA 인증을 완료해주세요",
+		captchaError: "CAPTCHA 오류",
+		// Auth flow messages
 		signingIn: "로그인 중...",
 		creatingAccount: "계정 생성 중...",
 		loginFailed: "로그인 실패",
