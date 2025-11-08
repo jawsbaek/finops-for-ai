@@ -51,7 +51,6 @@ export const env = createEnv({
 
 		// Cap.js CAPTCHA
 		CAP_SECRET_KEY: z.string().min(32),
-		CAP_DIFFICULTY: z.coerce.number().int().positive().default(100000),
 		// CAP_BYPASS: Parse boolean correctly from string values
 		// - "true", "1", "yes" → true
 		// - "false", "0", "no", undefined, "" → false
@@ -103,7 +102,6 @@ export const env = createEnv({
 		UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
 		ENABLE_COSTS_API: process.env.ENABLE_COSTS_API,
 		CAP_SECRET_KEY: process.env.CAP_SECRET_KEY,
-		CAP_DIFFICULTY: process.env.CAP_DIFFICULTY,
 		CAP_BYPASS: process.env.CAP_BYPASS,
 		NEXT_PUBLIC_CAP_SITE_KEY: process.env.NEXT_PUBLIC_CAP_SITE_KEY,
 	},

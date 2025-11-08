@@ -58,7 +58,11 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json(
 			{
 				error: "Failed to create challenge",
-				message: error instanceof Error ? error.message : String(error),
+				// Only include error details in development for debugging
+				// Production: Hide internal errors to prevent information leakage
+				...(process.env.NODE_ENV === "development" && {
+					message: error instanceof Error ? error.message : String(error),
+				}),
 			},
 			{ status: 500, headers },
 		);

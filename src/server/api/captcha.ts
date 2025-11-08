@@ -128,15 +128,16 @@ export async function createCaptchaChallenge() {
 	const challenge = await cap.createChallenge({
 		challengeCount: 50, // Number of hashes to solve (default: 50)
 		challengeSize: 32, // Bytes per challenge (default: 32)
-		// Difficulty level for proof-of-work computation
+		// Difficulty level: Hardcoded to 4 for optimal UX
 		//
-		// Cap.js difficulty values:
+		// Cap.js difficulty scale:
 		// - 1-4: Fast (< 1 second) - suitable for high-traffic sites
 		// - 5-10: Medium (1-3 seconds) - balanced security/UX
 		// - 10+: Slow (3+ seconds) - high security, poor UX
 		//
-		// Use the default difficulty (4) for optimal UX
-		// The CAP_DIFFICULTY env var is kept for future customization
+		// We use level 4 (default) to provide fast CAPTCHA solving while
+		// maintaining effective bot protection. Higher values caused worker
+		// timeouts and poor user experience.
 		challengeDifficulty: 4,
 		expiresMs: 600000, // 10 minutes
 	});
